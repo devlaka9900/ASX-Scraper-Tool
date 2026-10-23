@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python \"C:\\\\Users\\\\BINURA~1.LAK\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Binura-Lakshan-Desktop-CUBE-Scripts-asx-pdf-checker\\\\32efe204-e204-4187-86e9-9e30fc8e9144\\\\scratchpad\\\\run_check.py\" 2>&1)",
+      "PowerShell(python -c \"import bs4; print\\('bs4 version:', bs4.__version__\\)\")",
+      "Read(//c/Users/Binura.Lakshan/Desktop/CUBE Scripts/**)",
+      "PowerShell(python \"C:\\\\Users\\\\BINURA~1.LAK\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Binura-Lakshan-Desktop-CUBE-Scripts-asx-pdf-checker\\\\4f17970d-24c3-4265-90e4-a9823b2a91ec\\\\scratchpad\\\\fix_headings.py\")",
+      "PowerShell(python \"C:\\\\Users\\\\BINURA~1.LAK\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Binura-Lakshan-Desktop-CUBE-Scripts-asx-pdf-checker\\\\8d1e9f18-415f-4498-ac38-0e1f05d8b596\\\\scratchpad\\\\fix_footnotes.py\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Binura.Lakshan\\Desktop\\CUBE Scripts"
+    ]
+  }
+}
