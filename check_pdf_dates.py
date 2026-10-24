@@ -97,7 +97,7 @@ def check_pdfs(downloads_dir: Path, cutoff: datetime) -> None:
 
 
 def main() -> None:
-    project_id = Prompt.ask("[bold]Project ID[/bold] (e.g. 123)").strip()
+    project_id = Prompt.ask("[bold]DocumentId[/bold] (e.g. 123)").strip()
     downloads_dir = Path("output") / project_id / "downloads"
 
     if not downloads_dir.exists():

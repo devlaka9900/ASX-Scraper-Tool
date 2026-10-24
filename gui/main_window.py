@@ -8,14 +8,17 @@ from PySide6.QtCore import QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QMainWindow, QMessageBox, QWidget
 
+from core.notes import NotesError, NotesStore
 from core.paths import resource_path
 from core.pipeline import RunRequest
 from core.summary import RunResult, SummaryError, load_run
 from core.version import APP_NAME
 from gui import theme
+from gui.pages.agent import AgentPage
 from gui.pages.date_checker import DateCheckerPage
 from gui.pages.history import HistoryPage
 from gui.pages.new_run import NewRunPage
+from gui.pages.notes import NotesPage
 from gui.pages.results import ResultsPage
 from gui.pages.run_view import RunView
 from gui.settings import Settings
@@ -25,7 +28,7 @@ from gui.workers import JobRunner
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, notes_path=None):
         super().__init__()
         self._settings = settings
         self._run_screen_active = False
@@ -53,7 +56,15 @@ class MainWindow(QMainWindow):
         self.results = ResultsPage()
         self.history = HistoryPage(settings)
         self.date_checker = DateCheckerPage(settings)
-        for page in (self.new_run, self.run_view, self.results, self.history, self.date_checker):
+        try:
+            notes_store, notes_error = NotesStore(notes_path), None
+        except (NotesError, OSError) as exc:
+            notes_store, notes_error = None, str(exc)
+        self.notes = NotesPage(notes_store, notes_error)
+        self.notes_store = notes_store
+        self.agent = AgentPage()
+        for page in (self.new_run, self.run_view, self.results, self.history, self.date_checker,
+                     self.notes, self.agent):
             self.stack.addWidget(page)
 
         self.runner = JobRunner(self)
@@ -95,7 +106,13 @@ class MainWindow(QMainWindow):
             "results": self.results,
             "history": self.history,
             "date_checker": self.date_checker,
+            "notes": self.notes,
+            "agent": self.agent,
         }[key]
+        # leaving the Notes page with unsaved edits: ask first, and stay if the user cancels
+        if self.stack.currentWidget() is self.notes and target is not self.notes and not self.notes.can_leave():
+            self.sidebar.select("notes")
+            return
         self.sidebar.select(key)
         self.stack.fade_to(target)
         if key == "new_run" and target is self.new_run:
@@ -201,6 +218,9 @@ class MainWindow(QMainWindow):
     # ---- close ---------------------------------------------------------------------- #
 
     def closeEvent(self, event) -> None:
+        if self.notes.has_unsaved() and not self.notes.can_leave():
+            event.ignore()
+            return
         if self.runner.busy:
             answer = QMessageBox.question(
                 self, APP_NAME, "A job is still running. Cancel it and exit?",

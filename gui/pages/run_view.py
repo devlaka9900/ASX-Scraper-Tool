@@ -12,6 +12,7 @@ from gui import anim, icons, theme
 from gui.widgets.common import ElidedLabel, IconButton, card, label
 from gui.widgets.log_view import LogView
 from gui.widgets.stepper import Stepper
+from gui.widgets.watermark import WatermarkWidget
 
 # share of the overall bar given to each stage
 _WEIGHTS = {"scrape": (0.0, 0.06), "folders": (0.06, 0.02), "download": (0.08, 0.72),
@@ -32,7 +33,7 @@ def _fmt_eta(seconds: float) -> str:
     return f"{s // 60}m {s % 60:02d}s"
 
 
-class RunView(QWidget):
+class RunView(WatermarkWidget):
     cancelRequested = Signal()
     backRequested = Signal()
 
@@ -119,7 +120,9 @@ class RunView(QWidget):
 
     def begin(self, req: RunRequest) -> None:
         self._title.setText("Running…")
-        self._subtitle.set_full_text(f"{req.project_id}  ·  cutoff {req.cutoff:%Y-%m-%d}  ·  {req.url}")
+        start = f"  ·  Startpoint {req.startpoint}" if req.startpoint else ""
+        self._subtitle.set_full_text(
+            f"DocumentId {req.project_id}{start}  ·  cutoff {req.cutoff:%Y-%m-%d}  ·  {req.url}")
         self._stepper.reset()
         self._stage = ""
         self._failed_n = 0

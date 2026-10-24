@@ -39,8 +39,8 @@ LIGHT = {
     "hover": "#eceae5", "border": "#e1e0d9", "border_strong": "#c3c2b7",
     "text": "#0b0b0b", "text_secondary": "#52514e", "text_muted": "#66655f",
     "text_disabled": "#a8a7a0",
-    "accent": "#2a78d6", "accent_hover": "#256abf", "accent_text": "#ffffff",
-    "accent_soft": "rgba(42,120,214,0.14)", "accent_ink": "#1c5cab",
+    "accent": "#2673cc", "accent_hover": "#1f5fb0", "accent_text": "#ffffff",   # white on accent: 4.77:1
+    "accent_soft": "rgba(38,115,204,0.14)", "accent_ink": "#1c5cab",
     "danger": "#c4302f", "danger_soft": "rgba(196,48,47,0.12)",
     "track": "#e1e0d9", "overlay": "#f9f9f7",
     **_STATUS,
@@ -103,6 +103,10 @@ QLabel[role="h3"] { font-size: 11pt; font-weight: 600; }
 QLabel[role="caption"] { color: @text_muted; font-size: 9pt; }
 QLabel[role="error"] { color: @danger; font-size: 9pt; }
 QLabel[role="hint"] { color: @text_muted; font-size: 9pt; }
+QLabel[role="pill"] {
+    background: @accent_soft; color: @text; border: 1px solid @border_strong; border-radius: 12px;
+    padding: 3px 12px; font-size: 9.5pt;
+}
 
 QFrame[card="true"] { background: @surface; border: 1px solid @border; border-radius: 12px; }
 QFrame[card="flat"] { background: @surface2; border: 1px solid @border; border-radius: 10px; }
@@ -173,7 +177,17 @@ QCalendarWidget #qt_calendar_navigationbar { background: @surface2; }
 QCalendarWidget QAbstractItemView:enabled {
     background: @surface; color: @text; selection-background-color: @accent; selection-color: @accent_text; outline: none;
 }
-QCalendarWidget QAbstractItemView:disabled { color: @text_disabled; }
+QCalendarWidget QAbstractItemView:disabled { color: @text_muted; }
+/* The day grid is a QTableView internally. Keep it free of the data-table padding/borders,
+   otherwise the ~36px cells have no room left for two-digit days. */
+QCalendarWidget QTableView { background: @surface; color: @text; border: none; outline: none; gridline-color: transparent; }
+QCalendarWidget QTableView::item { padding: 0px; margin: 0px; border: none; }
+QCalendarWidget QTableView::item:hover { background: @hover; }
+QCalendarWidget QTableView::item:selected { background: @accent; color: @accent_text; }
+QCalendarWidget QHeaderView { background: @surface; }
+QCalendarWidget QHeaderView::section {
+    background: @surface; color: @text_muted; border: none; padding: 4px 0px; font-weight: 600; font-size: 9pt;
+}
 
 QCheckBox { spacing: 10px; background: transparent; color: @text; }
 QCheckBox::indicator { width: 18px; height: 18px; border: 1px solid @border_strong; border-radius: 5px; background: @surface2; }
@@ -181,20 +195,22 @@ QCheckBox::indicator:hover { border-color: @accent; }
 QCheckBox::indicator:checked { background: @accent; border-color: @accent; image: url("@check"); }
 QCheckBox:focus { color: @text; }
 
-QTableView {
+/* Data tables only (property set in ResultsView / HistoryPage). Never style bare QTableView:
+   QCalendarWidget's day grid is one and would inherit the padding. */
+QTableView[dataTable="true"] {
     background: @surface; alternate-background-color: @surface; color: @text; border: none;
     gridline-color: transparent; selection-background-color: @accent_soft; selection-color: @text; outline: none;
 }
-QTableView::item { padding: 0 12px; border-bottom: 1px solid @border; }
-QTableView::item:hover { background: @hover; }
-QTableView::item:selected { background: @accent_soft; }
-QHeaderView { background: @surface; }
-QHeaderView::section {
+QTableView[dataTable="true"]::item { padding: 0 12px; border-bottom: 1px solid @border; }
+QTableView[dataTable="true"]::item:hover { background: @hover; }
+QTableView[dataTable="true"]::item:selected { background: @accent_soft; }
+QTableView[dataTable="true"] QHeaderView { background: @surface; }
+QTableView[dataTable="true"] QHeaderView::section {
     background: @surface; color: @text_muted; border: none; border-bottom: 1px solid @border_strong;
     padding: 10px 12px; font-weight: 600; font-size: 9pt;
 }
-QHeaderView::section:hover { color: @text; }
-QTableCornerButton::section { background: @surface; border: none; }
+QTableView[dataTable="true"] QHeaderView::section:hover { color: @text; }
+QTableView[dataTable="true"] QTableCornerButton::section { background: @surface; border: none; }
 
 QScrollBar:vertical { background: transparent; width: 12px; margin: 2px; }
 QScrollBar::handle:vertical { background: @border_strong; border-radius: 4px; min-height: 32px; margin: 0 2px; }
@@ -212,6 +228,21 @@ QPlainTextEdit {
     background: @surface2; color: @text_secondary; border: 1px solid @border; border-radius: 8px;
     padding: 8px; font-family: @mono; font-size: 9pt; selection-background-color: @accent; selection-color: @accent_text;
 }
+QTextEdit {
+    background: transparent; color: @text; border: none; padding: 4px 2px;
+    selection-background-color: @accent; selection-color: @accent_text; font-size: 10.5pt;
+}
+QListWidget[noteList="true"] { background: transparent; border: none; outline: none; }
+QListWidget[noteList="true"]::item { border-radius: 8px; margin: 2px 0; }
+QListWidget[noteList="true"]::item:hover { background: @hover; }
+QListWidget[noteList="true"]::item:selected { background: @accent_soft; }
+QPushButton[tool="true"] {
+    background: transparent; border: 1px solid @border_strong; border-radius: 8px; padding: 0; min-height: 0;
+    color: @text; font-size: 11pt;
+}
+QPushButton[tool="true"]:hover { background: @hover; }
+QPushButton[tool="true"]:checked { background: @accent_soft; border-color: @accent; }
+QPushButton[tool="true"]::menu-indicator { image: none; width: 0; }
 QScrollArea { background: transparent; border: none; }
 QScrollArea > QWidget > QWidget { background: transparent; }
 

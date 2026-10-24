@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASX PDF Checker — Documentation</title>
+<style>
+  :root {
+    --bg: #f9f9f7; --surface: #fcfcfb; --surface2: #f3f3f0; --border: #e1e0d9; --border-strong: #c3c2b7;
+    --text: #0b0b0b; --text2: #52514e; --muted: #66655f; --accent: #2a78d6; --accent-ink: #1c5cab;
+    --accent-soft: rgba(42,120,214,.12); --good: #0ca30c; --warn: #fab219; --bad: #d03b3b; --neutral: #898781;
+    --code-bg: #f1f0ec; --shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0d0d; --surface: #1a1a19; --surface2: #222221; --border: #2c2c2a; --border-strong: #3d3d3a;
+      --text: #f0efec; --text2: #c3c2b7; --muted: #a09f98; --accent: #3987e5; --accent-ink: #86b6ef;
+      --accent-soft: rgba(57,135,229,.2); --code-bg: #222221; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0d0d; --surface: #1a1a19; --surface2: #222221; --border: #2c2c2a; --border-strong: #3d3d3a;
+    --text: #f0efec; --text2: #c3c2b7; --muted: #a09f98; --accent: #3987e5; --accent-ink: #86b6ef;
+    --accent-soft: rgba(57,135,229,.2); --code-bg: #222221; --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+  a { color: var(--accent-ink); }
+  header.top { display: flex; align-items: center; gap: 16px; padding: 14px 28px; border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 5; }
+  header.top h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header.top .ver { color: var(--muted); font-size: 13px; }
+  header.top .sp { flex: 1; }
+  button.theme { background: var(--surface2); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px; }
+  button.theme:hover { background: var(--accent-soft); }
+  .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 0; max-width: 1280px; margin: 0 auto; }
+  nav[role="tablist"] { padding: 22px 14px; position: sticky; top: 58px; align-self: start; max-height: calc(100vh - 58px); overflow: auto; }
+  nav[role="tablist"] button { display: block; width: 100%; text-align: left; background: transparent; color: var(--text2); border: 1px solid transparent; border-radius: 9px; padding: 9px 12px; margin-bottom: 2px; font: inherit; font-size: 14px; cursor: pointer; }
+  nav[role="tablist"] button:hover { background: var(--surface2); color: var(--text); }
+  nav[role="tablist"] button[aria-selected="true"] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+  nav[role="tablist"] button:focus-visible, button.theme:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  main { padding: 26px 32px 70px; min-width: 0; }
+  section[role="tabpanel"] { display: none; max-width: 940px; }
+  section[role="tabpanel"].active { display: block; animation: fade .18s ease-out; }
+  @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { section[role="tabpanel"].active { animation: none; } html { scroll-behavior: auto; } }
+  h2 { font-size: 26px; margin: 0 0 6px; letter-spacing: -.01em; }
+  h3 { font-size: 18px; margin: 28px 0 8px; }
+  h4 { font-size: 15px; margin: 18px 0 6px; color: var(--text2); }
+  p.lead { color: var(--text2); font-size: 16px; margin: 0 0 18px; }
+  p, li { color: var(--text); }
+  li { margin: 3px 0; }
+  code, pre { font-family: "Cascadia Mono", Consolas, monospace; font-size: 13px; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 5px; }
+  pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow: auto; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; font-size: 14px; background: var(--surface); border: 1px solid var(--border); }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+  th { background: var(--surface2); color: var(--text2); font-weight: 600; font-size: 13px; }
+  tr:last-child td { border-bottom: none; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin: 14px 0; box-shadow: var(--shadow); }
+  .note { border-left: 4px solid var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 10px 16px; margin: 14px 0; }
+  .warn { border-left-color: var(--warn); background: rgba(250,178,25,.14); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 14px 0; }
+  .pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border-strong); color: var(--text2); background: var(--surface2); }
+  .tag-good::before, .tag-neutral::before, .tag-warn::before, .tag-bad::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 7px; }
+  .tag-good::before { background: var(--good); } .tag-neutral::before { background: var(--neutral); } .tag-warn::before { background: var(--warn); } .tag-bad::before { background: var(--bad); }
+  svg text { fill: var(--text); font: 12.5px "Segoe UI", sans-serif; }
+  svg .box { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.2; }
+  svg .box2 { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.2; }
+  svg .arrow { stroke: var(--text2); stroke-width: 1.4; fill: none; marker-end: url(#ah); }
+  svg .small { fill: var(--muted); font-size: 11px; }
+  footer { border-top: 1px solid var(--border); padding: 16px 28px; color: var(--muted); font-size: 13px; text-align: center; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } nav[role="tablist"] { position: static; display: flex; flex-wrap: wrap; gap: 4px; max-height: none; } nav[role="tablist"] button { width: auto; } main { padding: 20px 16px 60px; } }
+  @media print { header.top, nav[role="tablist"], footer, button.theme { display: none; } .layout { display: block; } section[role="tabpanel"] { display: block !important; max-width: none; page-break-after: always; animation: none; } body { background: #fff; color: #000; font-size: 12px; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>ASX PDF Checker</h1><span class="ver">Documentation · v1.2.0</span><span class="sp"></span>
+  <button class="theme" id="themeBtn" type="button" aria-label="Toggle colour theme">Theme</button>
+</header>
+
+<div class="layout">
+  <nav role="tablist" aria-label="Documentation sections" id="tabs">
+    <button role="tab" data-tab="overview" aria-selected="true" aria-controls="tab-overview" id="btn-overview">Overview</button>
+    <button role="tab" data-tab="srs" aria-selected="false" aria-controls="tab-srs" id="btn-srs">SRS</button>
+    <button role="tab" data-tab="stack" aria-selected="false" aria-controls="tab-stack" id="btn-stack">Tech stack</button>
+    <button role="tab" data-tab="deps" aria-selected="false" aria-controls="tab-deps" id="btn-deps">Requirements &amp; dependencies</button>
+    <button role="tab" data-tab="arch" aria-selected="false" aria-controls="tab-arch" id="btn-arch">Architecture</button>
+    <button role="tab" data-tab="data" aria-selected="false" aria-controls="tab-data" id="btn-data">Data &amp; files</button>
+    <button role="tab" data-tab="guide" aria-selected="false" aria-controls="tab-guide" id="btn-guide">User guide</button>
+    <button role="tab" data-tab="build" aria-selected="false" aria-controls="tab-build" id="btn-build">Build &amp; release</button>
+    <button role="tab" data-tab="testing" aria-selected="false" aria-controls="tab-testing" id="btn-testing">Testing &amp; QA</button>
+    <button role="tab" data-tab="security" aria-selected="false" aria-controls="tab-security" id="btn-security">Security &amp; privacy</button>
+    <button role="tab" data-tab="trouble" aria-selected="false" aria-controls="tab-trouble" id="btn-trouble">Troubleshooting</button>
+    <button role="tab" data-tab="changelog" aria-selected="false" aria-controls="tab-changelog" id="btn-changelog">Changelog</button>
+  </nav>
+
+  <main>
+  <!-- ============================ OVERVIEW ============================ -->
+  <section role="tabpanel" id="tab-overview" aria-labelledby="btn-overview" class="active">
+    <h2>Overview</h2>
+    <p class="lead">ASX PDF Checker finds out which documents on an ASX rules / guidance-notes / waivers page were updated after a given cutoff date, and produces the evidence: sorted PDF folders, markdown reports and an Excel workbook.</p>
+
+    <div class="grid">
+      <div class="card"><strong>1 · Scrape</strong><br>Reads the page, finds every PDF link per tab (Rules, Guidance notes, Waivers, Appendices…).</div>
+      <div class="card"><strong>2 · Download</strong><br>Fetches all PDFs concurrently (6 workers) with cancel support and safe temp files.</div>
+      <div class="card"><strong>3 · Analyse</strong><br>Reads each PDF's internal date (modified, else created) and page count.</div>
+      <div class="card"><strong>4 · Report</strong><br>Updated / Not updated / No date / Error — folders, <code>.md</code> reports, <code>report.xlsx</code>.</div>
+    </div>
+
+    <h3>Two front-ends, one core</h3>
+    <ul>
+      <li><strong>Desktop app</strong> (<code>gui_main.py</code>, or the packaged <code>ASX PDF Checker.exe</code>): New run, live Running view, Results dashboard, History, Date checker, Notes and the Agent placeholder; dark and light themes.</li>
+      <li><strong>Command line</strong> (<code>python main.py</code>, <code>python check_pdf_dates.py</code>): same behaviour as before the GUI existed; only the "Project ID" prompt and summary wording became "DocumentId".</li>
+    </ul>
+
+    <h3>How a PDF is classified</h3>
+    <table>
+      <tr><th>Status</th><th>Rule</th></tr>
+      <tr><td><span class="tag-good">Updated</span></td><td>PDF date is <strong>after</strong> 00:00 on the cutoff day.</td></tr>
+      <tr><td><span class="tag-neutral">Not updated</span></td><td>PDF date is on or before the cutoff.</td></tr>
+      <tr><td><span class="tag-warn">No date found</span></td><td>No readable <code>ModDate</code> / <code>CreationDate</code> in the PDF (or the file is not a valid PDF).</td></tr>
+      <tr><td><span class="tag-bad">Download error</span></td><td>The file could not be downloaded.</td></tr>
+    </table>
+    <p>The PDF date is the metadata <code>modDate</code>, falling back to <code>creationDate</code>. The upload date shown on the ASX page is read but is informational only.</p>
+
+    <div class="note"><strong>Cutoff date guidance.</strong> If the cutoff date is unavailable or difficult to determine, derive it from the Waivers section: use the date of the most recent document in that section, which reflects the latest version delivered by CUBE.</div>
+
+    <h3>What's new in 1.2.0</h3>
+    <ul>
+      <li><strong>DocumentId</strong> replaces the "Project ID" wording everywhere (app, reports, command line).</li>
+      <li>Optional <strong>Startpoint</strong> next to the DocumentId, shown on the app screens when entered.</li>
+      <li><strong>Notes</strong>: developer notes with a heading and bold / italic / underline / colour text (create, read, update, delete).</li>
+      <li><strong>Agent 🤖</strong>: an animated "under construction — coming soon" page.</li>
+      <li>A written versioning rule (<code>MAJOR.FEATURE.FIX</code>, see Build &amp; release).</li>
+    </ul>
+    <h3>What was new in 1.1.0</h3>
+    <ul>
+      <li>The cutoff date is typed by the user (no quick-pick shortcuts, field starts blank) and validated strictly.</li>
+      <li>New calendar popup used across the app; fixes day numbers that were clipped or invisible.</li>
+      <li>Developer note on the New run page; "Close results" on the Date checker.</li>
+      <li>This documentation.</li>
+    </ul>
+  </section>
+
+  <!-- ============================ SRS ============================ -->
+  <section role="tabpanel" id="tab-srs" aria-labelledby="btn-srs">
+    <h2>Software Requirements Specification</h2>
+    <p class="lead">Version 1.2.0 · structure follows IEEE&nbsp;830 in a lightweight form.</p>
+
+    <h3>1. Introduction</h3>
+    <h4>1.1 Purpose</h4>
+    <p>Specify the behaviour of ASX PDF Checker so that analysts, developers and QA share one definition of "done".</p>
+    <h4>1.2 Scope</h4>
+    <p>The product retrieves the PDFs published on an ASX regulation page, determines which changed after a cutoff date, and exports reports. It does not edit, convert or publish documents, and it does not talk to any system other than the ASX website.</p>
+    <h4>1.3 Definitions</h4>
+    <table>
+      <tr><th>Term</th><th>Meaning</th></tr>
+      <tr><td>Cutoff date</td><td>Calendar date entered by the user (<code>YYYY-MM-DD</code>). Documents dated after 00:00 of that day count as updated.</td></tr>
+      <tr><td>DocumentId</td><td>Name of the output sub-folder for a run, e.g. <code>AU--ASELA--REG--ASX-0</code>. (Called "Project ID" before 1.2.0; the stored field is still <code>project_id</code>.)</td></tr>
+      <tr><td>Startpoint</td><td>Optional free-text label entered next to the DocumentId (for example a starting chapter or reference). Display-only: it does not influence folders, downloads or classification.</td></tr>
+      <tr><td>Note</td><td>A developer note: a heading plus text with bold, italic, underline and colour. Stored per user.</td></tr>
+      <tr><td>Section</td><td>A tab on the ASX page (Rules, Guidance notes, Waivers, Appendices…); also a sub-folder of <code>downloads/</code>.</td></tr>
+      <tr><td>Run</td><td>One execution of scrape → download → analyse → report for a DocumentId.</td></tr>
+      <tr><td>Run summary</td><td><code>run_summary.json</code>, the machine-readable result of a run (see Data &amp; files).</td></tr>
+    </table>
+
+    <h3>2. Overall description</h3>
+    <ul>
+      <li><strong>Users:</strong> CUBE analysts and developers of the ASX domain (non-programmers must be able to operate the exe).</li>
+      <li><strong>Environment:</strong> Windows 11 x64 (the tested platform) or Windows 10 1809+ (the minimum for Qt 6), no administrator rights, internet access to <code>www.asx.com.au</code> (HTTPS).</li>
+      <li><strong>Constraints:</strong> one run at a time; Windows' 260-character path limit applies; output folder must be writable.</li>
+      <li><strong>Assumptions:</strong> PDFs carry usable metadata dates; the ASX page keeps its tab structure (a whole-page fallback exists).</li>
+    </ul>
+
+    <h3>3. Functional requirements</h3>
+    <table>
+      <tr><th>ID</th><th>Requirement</th><th>Verified by</th></tr>
+      <tr><td>FR-01</td><td>The user shall enter DocumentId, Page URL and Cutoff date, may enter an optional Startpoint, and may choose an output folder (default <code>output/</code> next to the exe).</td><td>UI test</td></tr>
+      <tr><td>FR-02</td><td>Input shall be validated: DocumentId <code>^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$</code> and not a reserved Windows name; URL must be http(s) with a host; cutoff must be a real date in <code>YYYY-MM-DD</code> (field starts blank); folder must be writable; a long-path warning is shown above ~164 characters.</td><td>UI test</td></tr>
+      <tr><td>FR-03</td><td>The tool shall find every PDF link, grouped by the page's tabs; if no tab structure exists it shall scan the whole page.</td><td>Selftest, parity</td></tr>
+      <tr><td>FR-04</td><td>PDFs shall be downloaded concurrently (6 workers) via a temporary file that is renamed on success; existing files are reused unless "Re-download" is ticked; if the page fetch needed the SSL fallback, downloads use it too.</td><td>E2E</td></tr>
+      <tr><td>FR-05</td><td>Each PDF shall be classified as Updated / Not updated / No date found / Download error using the rule in the Overview.</td><td>E2E, parity</td></tr>
+      <tr><td>FR-06</td><td>Updated PDFs shall be copied to <code>Updated_Books/</code> and undated ones to <code>Date_Not_Found/</code>; earlier copies are cleared before a re-run (no <code>_1</code> duplicates).</td><td>E2E</td></tr>
+      <tr><td>FR-07</td><td>The tool shall write <code>analysis_report.md</code>, <code>updated_page_count.md</code> and <code>report.xlsx</code>; if the workbook is open in Excel the run shall continue with a warning.</td><td>E2E</td></tr>
+      <tr><td>FR-08</td><td>The GUI shall show live progress (stage, counts, rate, ETA, log) and allow cancelling without leaving partial files. Cancel normally takes effect within about one second; a download stalled on the network can delay it by up to the 30 s request timeout, and the initial page fetch (up to 60 s) cannot be interrupted.</td><td>E2E</td></tr>
+      <tr><td>FR-09</td><td>The Results page shall show KPI cards, a status donut, per-section stacked bars and a searchable, sortable table; chart/KPI clicks filter the table.</td><td>UI test</td></tr>
+      <tr><td>FR-10</td><td>History shall list runs made with the app and re-open completed ones; "Remove from list" never deletes files.</td><td>E2E, UI test</td></tr>
+      <tr><td>FR-11</td><td>The Date checker shall re-classify downloaded PDFs against a new cutoff without copying files or overwriting reports; export is optional.</td><td>E2E</td></tr>
+      <tr><td>FR-12</td><td>The Date checker shall allow the user to close an opened result (button and <kbd>Esc</kbd>).</td><td>UI test</td></tr>
+      <tr><td>FR-13</td><td>Theme (system / dark / light), window geometry, output folder and the last DocumentId and URL shall be remembered. The cutoff date is deliberately <em>not</em> restored: the user must enter it each time.</td><td>UI test</td></tr>
+      <tr><td>FR-14</td><td>The New run page shall show the developer note about deriving the cutoff date from the Waivers section.</td><td>UI test</td></tr>
+      <tr><td>FR-15</td><td>The command-line tools shall keep working with their original behaviour (apart from the DocumentId wording).</td><td>Parity</td></tr>
+      <tr><td>FR-16</td><td>The optional Startpoint (free text, trimmed, up to 100 characters, no other rules) shall be stored in the run summary and displayed beside the DocumentId — Results header, Running view, History column, Date checker — only when entered. It shall not appear in the generated reports.</td><td>E2E, UI test</td></tr>
+      <tr><td>FR-17</td><td>The identifier formerly called "Project ID" shall be called DocumentId in every user-visible place (GUI, reports, command-line prompts, documentation); existing runs and folders remain valid.</td><td>UI test</td></tr>
+      <tr><td>FR-18</td><td>The Notes page shall let a user create, read, update and delete notes with a heading and a body that supports only bold, italic, underline and text colour; search; confirm deletions; warn before unsaved changes are lost; and store notes per Windows user without ever overwriting an unreadable notes file.</td><td>E2E, UI test</td></tr>
+      <tr><td>FR-19</td><td>The Agent page shall present an animated "under construction — coming soon" placeholder (static when reduced motion is requested) and offer no functionality.</td><td>UI test</td></tr>
+    </table>
+
+    <h3>4. Non-functional requirements</h3>
+    <table>
+      <tr><th>ID</th><th>Category</th><th>Requirement</th></tr>
+      <tr><td>NFR-01</td><td>Performance</td><td>The window opens within a few seconds (one-folder build, nothing is unpacked at start); reading ~580 already-downloaded PDFs takes roughly 15 s on a normal laptop; the UI stays responsive during a run (work is on a worker thread).</td></tr>
+      <tr><td>NFR-02</td><td>Reliability</td><td>No truncated PDF is ever treated as complete; a malformed history file cannot hide other runs; errors end a run as "failed" with a message, never a crash.</td></tr>
+      <tr><td>NFR-03</td><td>Usability</td><td>Minimum window 1100×720; keyboard navigation (<kbd>Alt+1…6</kbd>, <kbd>Ctrl+F</kbd>, <kbd>Ctrl+N</kbd>/<kbd>Ctrl+S</kbd> in Notes, <kbd>Esc</kbd>); body-text and button-label contrast ≥ 4.5:1 in both themes; status is always icon + text, never colour alone; reduced-motion respected.</td></tr>
+      <tr><td>NFR-04</td><td>Portability</td><td>Single zip, no installer, no admin rights, no Python needed on the target machine.</td></tr>
+      <tr><td>NFR-05</td><td>Security &amp; privacy</td><td>No telemetry; all data stays on disk locally; run summaries are loaded with path-traversal protection.</td></tr>
+      <tr><td>NFR-06</td><td>Maintainability</td><td><code>core/</code> contains no Qt imports and is covered by automated tests; the CLI shares the same scraper/analyzer/reporter modules.</td></tr>
+    </table>
+
+    <h3>5. External interfaces</h3>
+    <ul>
+      <li><strong>User interface:</strong> desktop window (Qt), see User guide.</li>
+      <li><strong>File system:</strong> reads/writes the output folder; logs in <code>%LOCALAPPDATA%\ASX PDF Checker\logs</code>.</li>
+      <li><strong>Network:</strong> HTTP(S) GET to the page URL you enter and to the PDF links on that page — normally all on <code>www.asx.com.au</code>. Nothing else is contacted.</li>
+      <li><strong>Registry:</strong> per-user settings under <code>HKCU\Software\CUBE\ASXPDFChecker</code> (QSettings).</li>
+    </ul>
+
+    <h3>6. Acceptance criteria</h3>
+    <ol>
+      <li>For any live page the GUI pipeline and the CLI report identical category counts (<code>tools/parity_check.py</code>). Reference result on 2026-10-23, ASX 24 page, cutoff 2024-01-01: 364 PDFs — 60 updated, 304 not updated, 0 no-date, 0 errors (the live page may change over time).</li>
+      <li>All automated checks in <em>Testing &amp; QA</em> pass, and the packaged exe passes <code>--selftest</code>, starts, and exits cleanly.</li>
+      <li>Every day number (1–31) is readable in the calendar popup in both themes.</li>
+    </ol>
+  </section>
+
+  <!-- ============================ TECH STACK ============================ -->
+  <section role="tabpanel" id="tab-stack" aria-labelledby="btn-stack">
+    <h2>Technology stack</h2>
+    <p class="lead">Versions are those the 1.2.0 build was produced and tested with.</p>
+    <table>
+      <tr><th>Layer</th><th>Technology</th><th>Version</th><th>Why</th></tr>
+      <tr><td>Language</td><td>Python</td><td>3.14.4</td><td>Existing codebase; the CLI needs 3.10+.</td></tr>
+      <tr><td>GUI</td><td>PySide6 (Qt 6), Essentials only</td><td>6.12.0</td><td>Native, smooth, themeable; Essentials keeps the exe small (no WebEngine/Charts).</td></tr>
+      <tr><td>Charts</td><td>Custom <code>QPainter</code> widgets</td><td>—</td><td>Full control over theming, animation and accessibility without QtCharts.</td></tr>
+      <tr><td>Icons</td><td>Inline SVG via <code>QtSvg</code></td><td>—</td><td>No external assets; recoloured per theme.</td></tr>
+      <tr><td>PDF reading</td><td>PyMuPDF (<code>fitz</code>)</td><td>1.28.0</td><td>Fast metadata and page-count access.</td></tr>
+      <tr><td>HTTP</td><td>requests + urllib3 + certifi</td><td>2.34.2 / 2.8.0 / 2026.10.19</td><td>Simple, proxy-aware, bundled CA store.</td></tr>
+      <tr><td>HTML parsing</td><td>beautifulsoup4 + lxml</td><td>4.15.0 / 6.1.3</td><td>Robust parsing of the AEM tab markup.</td></tr>
+      <tr><td>Dates</td><td>python-dateutil</td><td>3.0.0</td><td>Parses the page's day-first dates.</td></tr>
+      <tr><td>Excel</td><td>openpyxl</td><td>3.1.5</td><td>Styled sheet, validations, conditional formats, formulas.</td></tr>
+      <tr><td>Console (CLI)</td><td>rich, tqdm</td><td>15.0.0 / 4.70.1</td><td>CLI prompts and progress; disabled in the GUI.</td></tr>
+      <tr><td>Packaging</td><td>PyInstaller + hooks-contrib</td><td>6.20.0 / 2026.9</td><td>One-folder windowed build, no UPX.</td></tr>
+      <tr><td>Concurrency</td><td><code>ThreadPoolExecutor</code>, <code>QThread</code></td><td>stdlib / Qt</td><td>Downloads in a pool; the whole job on one worker thread; signals to the UI.</td></tr>
+      <tr><td>Persistence</td><td>JSON files, <code>QSettings</code></td><td>—</td><td>Human-readable run summaries; per-user preferences.</td></tr>
+    </table>
+    <h3>Design choices</h3>
+    <ul>
+      <li><strong>Core is Qt-free.</strong> <code>core/</code> (pipeline, summary, date check, paths) can be tested without a display and is shared conceptually with the CLI.</li>
+      <li><strong>Hooks, not forks.</strong> The downloader and analyzer gained optional <code>progress_cb</code> / <code>cancel</code> parameters, the logger a pluggable handler list and the output-folder helper a <code>root</code> argument; the pipeline checks the cancel flag between stages. The CLI calls everything without these and behaves as before.</li>
+      <li><strong>One render path.</strong> A live result and a History re-open both go through <code>load_run()</code>.</li>
+    </ul>
+  </section>
+
+  <!-- ============================ REQUIREMENTS & DEPENDENCIES ============================ -->
+  <section role="tabpanel" id="tab-deps" aria-labelledby="btn-deps">
+    <h2>Requirements &amp; dependencies</h2>
+
+    <h3>To run the packaged app</h3>
+    <ul>
+      <li>Windows 11 (tested) or Windows 10 1809 and later, 64-bit. Nothing to install; unzip and start <code>ASX PDF Checker.exe</code>.</li>
+      <li>Internet access to <code>www.asx.com.au</code> over HTTPS (corporate proxies with TLS inspection are supported via an automatic fallback).</li>
+      <li>A writable output folder (default: <code>output</code> next to the exe, otherwise <code>Documents\ASX PDF Checker\output</code>).</li>
+      <li>About 150 MB of disk for the app plus space for the downloaded PDFs.</li>
+    </ul>
+
+    <h3>To run from source</h3>
+<pre><code>python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements-gui.txt    # GUI + build tools (includes requirements.txt)
+python gui_main.py</code></pre>
+    <p>CLI only: <code>pip install -r requirements.txt</code> then <code>python main.py</code>.</p>
+
+    <h3>Python packages</h3>
+    <table>
+      <tr><th>Package</th><th>Pin / range</th><th>Used for</th><th>Needed at</th></tr>
+      <tr><td>beautifulsoup4</td><td>&gt;=4.12</td><td>HTML parsing</td><td>runtime</td></tr>
+      <tr><td>lxml</td><td>&gt;=5.2</td><td>BeautifulSoup parser</td><td>runtime</td></tr>
+      <tr><td>requests</td><td>&gt;=2.32</td><td>HTTP</td><td>runtime</td></tr>
+      <tr><td>PyMuPDF</td><td><strong>==1.28.0</strong> (GUI build)</td><td>PDF metadata, pages</td><td>runtime</td></tr>
+      <tr><td>tqdm</td><td>&gt;=4.66</td><td>CLI progress bar</td><td>runtime</td></tr>
+      <tr><td>rich</td><td>&gt;=13.7</td><td>CLI console / logging (not loaded in the GUI)</td><td>runtime</td></tr>
+      <tr><td>python-dateutil</td><td>&gt;=2.9</td><td>Page date parsing</td><td>runtime</td></tr>
+      <tr><td>openpyxl</td><td>&gt;=3.1</td><td>Excel report</td><td>runtime</td></tr>
+      <tr><td>PySide6-Essentials</td><td><strong>==6.12.0</strong></td><td>GUI</td><td>GUI</td></tr>
+      <tr><td>pyinstaller</td><td><strong>==6.20.0</strong></td><td>exe build</td><td>build</td></tr>
+    </table>
+    <div class="note"><strong>Why PyMuPDF is pinned.</strong> PyMuPDF 2.x pulls in ONNX Runtime and NumPy as dependencies, which would bloat the exe; 1.28.0 is the version the app was verified with.</div>
+
+    <h3>Licences to be aware of</h3>
+    <table>
+      <tr><th>Component</th><th>Licence</th><th>Note</th></tr>
+      <tr><td>PySide6 / Qt</td><td>LGPL-3.0 (or commercial)</td><td>Shipped as separate DLLs in the one-folder build, which keeps LGPL relinking possible.</td></tr>
+      <tr><td>PyMuPDF / MuPDF</td><td>AGPL-3.0 (or commercial)</td><td>Fine for internal use. Check the terms with the licence owner before distributing outside CUBE.</td></tr>
+      <tr><td>certifi, tqdm</td><td>MPL-2.0 (tqdm: MPL-2.0 and MIT)</td><td>File-level copyleft; using and redistributing them unmodified is fine, keep the licence notices.</td></tr>
+      <tr><td>Other packages</td><td>BSD / MIT / Apache style</td><td>No special obligations beyond notices.</td></tr>
+      <tr><td>PyInstaller (build time only)</td><td>GPL-2.0 with a bootloader exception</td><td>The exception allows distributing the generated exe under your own terms.</td></tr>
+    </table>
+    <p>This is a technical summary, not legal advice.</p>
+
+    <h3>Network endpoints</h3>
+    <table>
+      <tr><th>Host</th><th>Purpose</th></tr>
+      <tr><td><code>www.asx.com.au</code> (normally)</td><td>The host of the page URL entered by the user and of the PDFs it links to. Both <code>http</code> and <code>https</code> are accepted.</td></tr>
+    </table>
+    <p>No telemetry, update checks or other outbound connections exist.</p>
+  </section>
+
+  <!-- ============================ ARCHITECTURE ============================ -->
+  <section role="tabpanel" id="tab-arch" aria-labelledby="btn-arch">
+    <h2>Architecture</h2>
+    <p class="lead">A thin Qt shell over a Qt-free core, sharing the original scraper / analyzer / reporter modules with the CLI.</p>
+
+    <svg viewBox="0 0 900 360" role="img" aria-label="Layered architecture diagram" width="100%">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="fill:var(--text2)"/></marker></defs>
+      <rect class="box2" x="20" y="14" width="860" height="86" rx="10"/>
+      <text x="36" y="36" style="font-weight:600">GUI — gui/  (GUI thread)</text>
+      <rect class="box" x="36" y="48" width="120" height="40" rx="8"/><text x="50" y="72">Sidebar · pages</text>
+      <rect class="box" x="170" y="48" width="140" height="40" rx="8"/><text x="182" y="72">ResultsView · charts</text>
+      <rect class="box" x="324" y="48" width="120" height="40" rx="8"/><text x="338" y="72">DateInput · theme</text>
+      <rect class="box" x="458" y="48" width="130" height="40" rx="8"/><text x="470" y="72">Settings (QSettings)</text>
+      <rect class="box2" x="640" y="48" width="226" height="40" rx="8"/><text x="654" y="72" style="font-weight:600">JobRunner → QThread + signals</text>
+
+      <rect class="box2" x="20" y="130" width="860" height="86" rx="10"/>
+      <text x="36" y="152" style="font-weight:600">Core — core/  (worker thread, no Qt)</text>
+      <rect class="box" x="36" y="164" width="150" height="40" rx="8"/><text x="50" y="188">pipeline.run_pipeline</text>
+      <rect class="box" x="200" y="164" width="150" height="40" rx="8"/><text x="214" y="188">datecheck.check_folder</text>
+      <rect class="box" x="364" y="164" width="200" height="40" rx="8"/><text x="378" y="188">summary (run_summary.json)</text>
+      <rect class="box" x="578" y="164" width="120" height="40" rx="8"/><text x="592" y="188">events · paths</text>
+
+      <rect class="box" x="20" y="246" width="860" height="86" rx="10"/>
+      <text x="36" y="268" style="font-weight:600">Original modules (shared with the CLI)</text>
+      <rect class="box" x="36" y="280" width="170" height="40" rx="8"/><text x="50" y="304">scraper/page_scraper</text>
+      <rect class="box" x="220" y="280" width="180" height="40" rx="8"/><text x="234" y="304">scraper/pdf_downloader</text>
+      <rect class="box" x="414" y="280" width="170" height="40" rx="8"/><text x="428" y="304">analyzer/date_checker</text>
+      <rect class="box" x="598" y="280" width="270" height="40" rx="8"/><text x="612" y="304">reporter/ report_generator · excel_report</text>
+      <path class="arrow" d="M450 100 L450 128"/><path class="arrow" d="M450 216 L450 244"/>
+      <text class="small" x="462" y="118">signals ↓ ↑ progress, log, result</text>
+      <text class="small" x="462" y="236">callbacks: progress_cb / cancel Event</text>
+    </svg>
+
+    <h3>Run lifecycle</h3>
+    <ol>
+      <li>New run validates the form and emits a <code>RunRequest</code>; <code>MainWindow</code> shows the Running view and calls <code>JobRunner.start_run</code>.</li>
+      <li><code>JobRunner</code> moves a worker to a <code>QThread</code>; the worker calls <code>run_pipeline(req, progress_cb, cancel)</code>.</li>
+      <li>The pipeline scrapes, creates folders, downloads (thread pool), clears old copies, analyses, writes reports and the summary. Progress is throttled to ~20 updates/s; failed files are never throttled.</li>
+      <li>Cancel sets a <code>threading.Event</code> directly from the GUI thread; downloads stop between chunks and temp files are removed.</li>
+      <li>The result (<code>RunResult</code>) returns via a signal; completed runs open in Results, others stay on the Running view with the reason.</li>
+    </ol>
+
+    <h3>Module map</h3>
+    <table>
+      <tr><th>Path</th><th>Responsibility</th></tr>
+      <tr><td><code>gui_main.py</code></td><td>Entry point: stdio guard for the windowed exe, crash log, <code>--selftest</code>, QApplication.</td></tr>
+      <tr><td><code>gui/main_window.py</code>, <code>gui/pages/*</code></td><td>Navigation and screens: New run, Running, Results, History, Date checker, Notes, Agent.</td></tr>
+      <tr><td><code>gui/widgets/*</code></td><td>DonutChart, StackedBars, KpiCard, Stepper, ResultsView + table model, DateInput, watermark, sidebar.</td></tr>
+      <tr><td><code>gui/theme.py</code></td><td>Design tokens (dark/light) and the single stylesheet generator.</td></tr>
+      <tr><td><code>gui/workers.py</code></td><td><code>JobRunner</code>, worker thread, log bridge.</td></tr>
+      <tr><td><code>core/notes.py</code></td><td>Notes store: CRUD, search, atomic JSON persistence, corrupt-file recovery (no Qt).</td></tr>
+      <tr><td><code>gui/pages/notes.py</code>, <code>gui/notes_html.py</code></td><td>Notes page (list + editor + unsaved-changes guard) and the serializer that restricts note text to bold / italic / underline / colour.</td></tr>
+      <tr><td><code>gui/pages/agent.py</code></td><td>Animated "coming soon" placeholder page.</td></tr>
+      <tr><td><code>core/pipeline.py</code></td><td>Orchestration mirroring <code>main.py</code> without console I/O.</td></tr>
+      <tr><td><code>core/summary.py</code></td><td>Result types, JSON (de)serialisation, history scan, path safety.</td></tr>
+      <tr><td><code>core/datecheck.py</code></td><td>Read-only re-classification of downloaded PDFs.</td></tr>
+      <tr><td><code>utils/logger.py</code></td><td>Logging; GUI mode (no Rich) and pluggable handlers.</td></tr>
+      <tr><td><code>packaging/</code></td><td>PyInstaller spec and <code>build.ps1</code>.</td></tr>
+      <tr><td><code>tools/</code></td><td>Developer-only test and utility scripts.</td></tr>
+    </table>
+  </section>
+
+  <!-- ============================ DATA & FILES ============================ -->
+  <section role="tabpanel" id="tab-data" aria-labelledby="btn-data">
+    <h2>Data &amp; files</h2>
+
+    <h3>Output layout</h3>
+<pre><code>output/
+└─ &lt;DocumentId&gt;/
+   ├─ downloads/&lt;section&gt;/*.pdf        every PDF, grouped by page tab
+   ├─ Updated_Books/*.pdf              copies of PDFs dated after the cutoff
+   ├─ Date_Not_Found/*.pdf             copies of PDFs with no usable date
+   ├─ analysis_report.md               full inventory by category
+   ├─ updated_page_count.md            pages of updated PDFs
+   ├─ report.xlsx                      single sheet + summary panel
+   ├─ run_summary.json                 latest run (GUI runs)
+   ├─ history/run_&lt;YYYYMMDD_HHMMSS&gt;.json   one archive per run (feeds History)
+   └─ date_checks/&lt;cutoff&gt;_&lt;time&gt;/    optional Date checker exports</code></pre>
+    <p>Logs: <code>%LOCALAPPDATA%\ASX PDF Checker\logs\asx_checker.log</code> (rotating) and <code>crash.log</code> for unexpected errors.</p>
+
+    <h3>report.xlsx</h3>
+    <ul>
+      <li>One sheet, one table: Document ID, Section, Document Name, Date Modified/Created, Book Status, Page Count, Dev Status, QA Status.</li>
+      <li>Dev Status (Todo, Inprogress, In-review, Fixing) and QA Status (QA PASS, QA Fail, Reviewing) are dropdowns for analysts to fill in. The tool never writes values into them, <strong>but re-running a DocumentId regenerates <code>report.xlsx</code> from scratch</strong> — copy the workbook first if it already contains analyst entries.</li>
+      <li>A right-hand panel of formulas (totals, updated counts and pages, per-section breakdown, status breakdowns) recalculates from the table.</li>
+    </ul>
+
+    <h3>run_summary.json (schema v1)</h3>
+<pre><code>{
+  "schema_version": 1,
+  "app_version": "1.2.0",
+  "kind": "run",                       // or "date_check"
+  "meta": {
+    "run_id": "20261023_101500", "project_id": "...",   // the DocumentId
+    "startpoint": "",                  // optional; absent in files written before 1.2.0
+    "url": "...", "cutoff": "2024-01-01",
+    "started_at": "2026-10-23T10:15:00", "finished_at": "...", "duration_s": 72.0,
+    "status": "completed",             // completed | cancelled | failed
+    "error": null, "warnings": [], "source_run": null, "output_root": "..."
+  },
+  "stats": {
+    "total": 364, "updated": 60, "not_updated": 304, "no_date": 0, "download_error": 0,
+    "updated_pages": 0, "total_pages": 0,
+    "by_section": { "Rules": { "updated": 0, "not_updated": 0, "no_date": 0, "download_error": 0 } }
+  },
+  "entries": [ { "name": "...", "url": "...", "section": "rules", "section_label": "Rules",
+                 "upload_date": null, "http_date": null, "pdf_meta_date": "2025-06-01T12:00:00",
+                 "resolved_date": "2025-06-01T12:00:00", "date_source": "pdf_metadata",
+                 "local_path": "downloads/rules/x.pdf", "page_count": 12,
+                 "download_error": "", "category": "updated" } ]
+}</code></pre>
+    <ul>
+      <li>Dates are naive ISO-8601; <code>local_path</code> is relative to the project folder (absolute paths, drive letters and <code>..</code> are rejected on load).</li>
+      <li>Files are written atomically (temp file + rename). A newer <code>schema_version</code> is refused with a clear message.</li>
+      <li>Fields added later (such as <code>startpoint</code>) are optional: older files still load and show an empty value.</li>
+    </ul>
+
+    <h3>notes.json (Notes)</h3>
+    <p>Location: <code>%LOCALAPPDATA%\ASX PDF Checker\notes.json</code> — one file per Windows user, not shared and not part of the app folder, so it survives updates.</p>
+<pre><code>{
+  "schema_version": 1,
+  "notes": [ { "id": "3f2a…", "title": "Release checklist",
+               "body_html": "&lt;p&gt;&lt;b&gt;Before shipping&lt;/b&gt; …&lt;/p&gt;",   // only p, br, b, i, u, span[color]
+               "body_text": "Before shipping …",                          // plain text for search/preview
+               "created_at": "2026-10-24T09:07:00", "updated_at": "2026-10-24T09:07:00" } ]
+}</code></pre>
+    <ul>
+      <li>Limits: heading up to 120 characters, text up to 200&nbsp;000 characters.</li>
+      <li>Writes are atomic and the previous version is kept as <code>notes.json.bak</code>.</li>
+      <li>An unreadable file is never overwritten: it is renamed <code>notes.corrupt-&lt;time&gt;.json</code> and a new list is started (the Notes page says so). If only some entries are damaged, the rest load and a copy of the original is kept as <code>notes.damaged-&lt;time&gt;.json</code>. A file written by a newer app version is refused and left untouched.</li>
+      <li>Saving is all-or-nothing: if the file cannot be written (locked, disk full), the list in memory is not changed, so nothing is lost or resurrected later.</li>
+      <li>The text is stored as plain JSON on disk: do not put secrets in notes.</li>
+    </ul>
+  </section>
+
+  <!-- ============================ USER GUIDE ============================ -->
+  <section role="tabpanel" id="tab-guide" aria-labelledby="btn-guide">
+    <h2>User guide</h2>
+
+    <h3>1 · Start a run</h3>
+    <ol>
+      <li>Open <strong>New run</strong>. Enter the <strong>DocumentId</strong>, optionally a <strong>Startpoint</strong> (free text; shown beside the DocumentId on the result, run, history and date-check screens), and paste the <strong>Page URL</strong>.</li>
+      <li>Type the <strong>Cutoff date</strong> as <code>YYYY-MM-DD</code> (dashes are added for you) or pick it from the calendar button. The field is intentionally blank.</li>
+      <li>Check the <strong>Output folder</strong> (use <em>Browse…</em> to change it; the choice is remembered).</li>
+      <li>Press <strong>Start run</strong>. The button stays disabled until every field is valid; messages appear under fields you have visited.</li>
+    </ol>
+    <div class="note"><strong>Developer note.</strong> If the cutoff date is unavailable or difficult to determine, derive it from the Waivers section: use the date of the most recent document in that section, which reflects the latest version delivered by CUBE.</div>
+
+    <h3>2 · Watch the run</h3>
+    <p>The stepper shows Scrape → Folders → Download → Analyse → Reports. The panel shows counts, files per second and ETA; <em>Live log</em> expands the log. <strong>Cancel run</strong> stops the job; files already downloaded are kept, no reports are written.</p>
+
+    <h3>3 · Read the results</h3>
+    <ul>
+      <li><strong>KPI cards</strong> and the <strong>status donut</strong> show counts; click a card, slice or legend row to filter the table. Click again to clear.</li>
+      <li><strong>Books per section</strong>: click a segment to filter by section and status.</li>
+      <li><strong>Table</strong>: search (<kbd>Ctrl+F</kbd>), status chips, section list, click headers to sort, right-click a row for <em>Open PDF</em>, <em>Show in folder</em>, <em>Copy URL</em>; right-click the header to show the Date source and URL columns. Double-click opens the PDF.</li>
+      <li>The buttons above open the output folder, <code>Updated_Books</code>, <code>Date_Not_Found</code>, <code>report.xlsx</code> and the analysis report.</li>
+    </ul>
+
+    <h3>4 · History</h3>
+    <p>Lists runs made with the app (newest first). Double-click or <em>Open results</em> re-opens a completed run; <em>Remove from list</em> hides it without deleting any file.</p>
+
+    <h3>5 · Date checker</h3>
+    <ol>
+      <li>Choose a project folder (or a <code>downloads</code> folder, or any folder of PDFs) — pick from earlier runs or browse.</li>
+      <li>Enter a new cutoff date and press <strong>Check dates</strong>. Nothing is downloaded, copied or overwritten.</li>
+      <li>Use <strong>Export reports</strong> to write the reports to <code>date_checks/…</code>. Use <strong>Close results</strong> (or <kbd>Esc</kbd>) to dismiss the result and return to the form.</li>
+    </ol>
+
+    <h3>6 · Notes</h3>
+    <ol>
+      <li>Open <strong>Notes</strong> and press <strong>New note</strong> (<kbd>Ctrl+N</kbd>). Give it a <strong>heading</strong> and write the text.</li>
+      <li>Select text and use <strong>B</strong>, <em>I</em>, <u>U</u> or the <strong>A</strong> colour menu. Those four are the only formats; pasted text is always plain.</li>
+      <li><strong>Save</strong> (<kbd>Ctrl+S</kbd>) stores the note. The status shows <em>Unsaved changes</em> until you do; if you switch notes, leave the page or close the app first, you are asked whether to save.</li>
+      <li>Click a note in the list to open and edit it; the search box filters by heading and text. <strong>Delete</strong> asks for confirmation and cannot be undone.</li>
+      <li>Notes are private to your Windows account (see Data &amp; files); they are not shared with colleagues.</li>
+    </ol>
+
+    <h3>7 · Agent 🤖</h3>
+    <p>A placeholder page: the Agent is under construction and coming soon. There is nothing to configure yet.</p>
+
+    <h3>Keyboard shortcuts</h3>
+    <table>
+      <tr><th>Keys</th><th>Action</th></tr>
+      <tr><td><kbd>Alt+1</kbd> … <kbd>Alt+6</kbd></td><td>New run · Results · History · Date checker · Notes · Agent</td></tr>
+      <tr><td><kbd>Ctrl+N</kbd> / <kbd>Ctrl+S</kbd></td><td>Notes: new note / save note</td></tr>
+      <tr><td><kbd>Ctrl+F</kbd></td><td>Focus the table (or notes) search</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close the Date checker result</td></tr>
+      <tr><td>Arrow keys + <kbd>Enter</kbd></td><td>Move through and toggle the donut legend</td></tr>
+    </table>
+  </section>
+
+  <!-- ============================ BUILD & RELEASE ============================ -->
+  <section role="tabpanel" id="tab-build" aria-labelledby="btn-build">
+    <h2>Build &amp; release</h2>
+<pre><code>powershell -ExecutionPolicy Bypass -File packaging\build.ps1</code></pre>
+    <h3>What the script does</h3>
+    <ol>
+      <li>Reads the version from <code>core/version.py</code> (single source of truth; must be numeric <code>MAJOR.FEATURE.FIX</code>, e.g. 1.2.0).</li>
+      <li>Creates <code>.venv-build</code> and installs <code>requirements-gui.txt</code> (pinned).</li>
+      <li>Writes the Windows version resource and creates the icon if missing.</li>
+      <li>Runs PyInstaller with <code>packaging/asx_pdf_checker.spec</code>: one-folder, windowed, no UPX, unused Qt modules excluded.</li>
+      <li><strong>Gate 1 — self-test:</strong> runs the exe with <code>--selftest</code> (imports, PDF round trip, scraper parse, reports and summary round trip, notes store and sanitizer, renders every page in both themes). A failure stops the build.</li>
+      <li><strong>Gate 2 — launch test:</strong> starts the exe, requires a main window after 8 s, closes it like a user, and requires exit code 0 and no growth of <code>crash.log</code>.</li>
+      <li>Copies <code>docs/</code> next to the exe and zips the staged folder to <code>dist\ASX_PDF_Checker_v&lt;version&gt;.zip</code>. Older release zips are left alone.</li>
+      <li><strong>Publish:</strong> only after every gate has passed, <code>dist\ASX PDF Checker</code> is refreshed from the verified build. The build itself happens in <code>build\stage</code>, so a running copy in <code>dist</code> is never disturbed: if the exe is running from <code>dist</code>, publishing is skipped with a message (the zip is still complete) and can be done later with <code>build.ps1 -PublishOnly</code>. A user's own <code>dist\ASX PDF Checker\output</code> folder (where runs land when the exe is started from there) is moved aside while publishing and restored afterwards.</li>
+    </ol>
+    <h3>Versioning</h3>
+    <p>Releases are numbered <code>MAJOR.FEATURE.FIX</code> — for example <code>v1.2.0</code>:</p>
+    <table>
+      <tr><th>Part</th><th>Bump it for</th><th>Resets</th><th>Example</th></tr>
+      <tr><td><strong>MAJOR</strong> (first)</td><td>A major release: a large change in what the product is or how it is used.</td><td>FEATURE and FIX → 0</td><td>1.4.2 → <code>2.0.0</code></td></tr>
+      <tr><td><strong>FEATURE</strong> (second)</td><td>A feature release: new capability, no major redesign.</td><td>FIX → 0</td><td>1.2.3 → <code>1.3.0</code></td></tr>
+      <tr><td><strong>FIX</strong> (third)</td><td>A bug-fix release: corrections only, no new features.</td><td>—</td><td>1.2.0 → <code>1.2.1</code></td></tr>
+    </table>
+    <p>History so far: <code>1.0.0</code> first GUI release → <code>1.1.0</code> feature release → <code>1.2.0</code> feature release (DocumentId/Startpoint, Notes, Agent). The rule is also written at the top of <code>core/version.py</code>; <code>tools/docs_check.py</code> fails the build when the version is not <code>N.N.N</code> or has no Changelog entry.</p>
+
+    <h3>Releasing a new version</h3>
+    <ol>
+      <li>Choose the next number with the rule above, set <code>APP_VERSION</code> in <code>core/version.py</code>, add an entry to the Changelog tab of this file and update the version in its header/footer (<code>tools/docs_check.py</code> fails the build if it is missing).</li>
+      <li>Run the test scripts (Testing &amp; QA), then <code>build.ps1</code>.</li>
+      <li>Optional live check of the packaged exe: set <code>ASX_SELFTEST_URL</code> to an ASX page and run <code>"ASX PDF Checker.exe" --selftest</code>; the log must report a scrape count.</li>
+      <li>Hand over the zip. The exe is unsigned, so Windows SmartScreen may show "Run anyway".</li>
+    </ol>
+    <h3>Packaging notes</h3>
+    <ul>
+      <li>Windowed exes have no stdout/stderr; <code>gui_main.py</code> replaces them before anything else is imported and writes unhandled errors to <code>crash.log</code>.</li>
+      <li>Typical size: ~146 MB for the app folder, ~65 MB zip (anything a user's own runs add under <code>output\</code> next to the exe is extra, and <code>build.ps1</code> carries it over when it publishes).</li>
+      <li>Fallback if a future Python/Qt combination misbehaves: build in a Python 3.13 venv.</li>
+    </ul>
+  </section>
+
+  <!-- ============================ TESTING ============================ -->
+  <section role="tabpanel" id="tab-testing" aria-labelledby="btn-testing">
+    <h2>Testing &amp; QA</h2>
+    <table>
+      <tr><th>Script</th><th>What it covers</th><th>Needs</th></tr>
+      <tr><td><code>tools/e2e_local.py</code></td><td>Pipeline against a local HTTP server: categories, page counts, summary/history, re-run without duplicates, cancel speed and temp-file cleanup, failure paths, date checker + export, path-safety, malformed history files, <code>JobRunner</code> signals and ordering, the Startpoint round trip (including summaries written before it existed) and the Notes store (CRUD, search, persistence, backup, limits, corrupt and newer-schema files).</td><td>venv python</td></tr>
+      <tr><td><code>tools/ui_interaction_test.py</code></td><td>Headless widget tests: donut/bar/KPI filtering, search and sorting, form validation, date input and calendar, Close results, watermark visibility, animated navigation, clean shutdown, the DocumentId/Startpoint wording and display, the six-page sidebar, the Agent animation (and its reduced-motion mode) and the whole Notes workflow through the real widgets (create, format, save, reopen, edit, search, delete, unsaved-change prompts, rich-text paste, corrupt-file banner).</td><td>venv python</td></tr>
+      <tr><td><code>tools/parity_check.py</code></td><td>Runs the CLI and the pipeline on the same live ASX URL and compares category counts.</td><td>network</td></tr>
+      <tr><td><code>gui_main.py --selftest</code></td><td>Import / round-trip / render smoke test; also the build gate. Set <code>ASX_SELFTEST_OUT</code> to keep screenshots, <code>ASX_SELFTEST_URL</code> for a live scrape.</td><td>—</td></tr>
+      <tr><td><code>tools/docs_check.py</code></td><td>Structural check of this document (tabs, ids, anchors, no external resources).</td><td>—</td></tr>
+    </table>
+    <h3>Run everything</h3>
+<pre><code>.venv-build\Scripts\python.exe tools\e2e_local.py
+.venv-build\Scripts\python.exe tools\ui_interaction_test.py
+.venv-build\Scripts\python.exe tools\docs_check.py
+.venv-build\Scripts\python.exe gui_main.py --selftest
+.venv-build\Scripts\python.exe tools\parity_check.py demo "&lt;ASX page URL&gt;" 2024-01-01   # live network</code></pre>
+    <h3>Manual checklist before a release</h3>
+    <ul>
+      <li>Both themes: every page readable; calendar shows all day numbers; table header aligned.</li>
+      <li>Start a real run, cancel it halfway, start again; open History; reopen the run.</li>
+      <li>Resize to the minimum 1100×720; no horizontal scrollbars on Results.</li>
+      <li>Close the window during a run: a confirmation appears and the app exits cleanly.</li>
+      <li>Open <code>report.xlsx</code> in Excel while re-running the same project: a warning, not a failure.</li>
+    </ul>
+    <h3>Review</h3>
+    <p>Each release candidate also gets an independent code review whose findings are verified before fixing; the 1.0.0 review fixed, among others, a page-fade crash, a summary path-safety gap and a progress-throttle bug.</p>
+  </section>
+
+  <!-- ============================ SECURITY ============================ -->
+  <section role="tabpanel" id="tab-security" aria-labelledby="btn-security">
+    <h2>Security &amp; privacy</h2>
+    <ul>
+      <li><strong>Local only.</strong> The app only contacts the host(s) in the URLs you give it. No telemetry, accounts or update checks.</li>
+      <li><strong>Path safety.</strong> <code>run_summary.json</code> files may be copied between machines, so stored file paths are accepted only when relative and inside the project folder (drive letters, rooted paths and <code>..</code> are rejected in both slash styles).</li>
+      <li><strong>Input hygiene.</strong> The DocumentId becomes a folder name and is validated (no separators, no reserved Windows names, length-limited).</li>
+      <li><strong>TLS.</strong> Normal verification with the bundled CA store. If the page fetch fails with an SSL error (typical of TLS-inspecting corporate proxies) the scraper — and then the downloader — retry <em>without</em> verification and log a warning. Use only on trusted networks.</li>
+      <li><strong>Downloaded files</strong> are opened only when the user double-clicks or chooses <em>Open PDF</em>; the tool never executes them.</li>
+      <li><strong>Notes.</strong> Stored in plain JSON in your per-user application-data folder (not encrypted, not shared); do not keep secrets in them. Note text is reduced to bold / italic / underline / colour on save and on load, so pasted or hand-edited content cannot add fonts, links, images or scripts.</li>
+      <li><strong>Crash handling.</strong> Unhandled exceptions are written to <code>crash.log</code>; no data is sent anywhere.</li>
+      <li><strong>Unsigned build.</strong> Verify the zip's origin; SmartScreen warnings are expected until the exe is code-signed.</li>
+    </ul>
+  </section>
+
+  <!-- ============================ TROUBLESHOOTING ============================ -->
+  <section role="tabpanel" id="tab-trouble" aria-labelledby="btn-trouble">
+    <h2>Troubleshooting &amp; known limitations</h2>
+    <table>
+      <tr><th>Symptom</th><th>Cause</th><th>What to do</th></tr>
+      <tr><td>Many "No such file or directory" download errors</td><td>The full file path exceeds Windows' 260-character limit.</td><td>Choose a shorter output folder or DocumentId (the form warns above ~164 characters).</td></tr>
+      <tr><td>Page fetch fails with an SSL error</td><td>TLS-inspecting proxy.</td><td>The app retries without verification automatically; check the live log for the warning.</td></tr>
+      <tr><td>"No PDF links found"</td><td>Wrong URL, or the page layout changed.</td><td>Open the URL in a browser; confirm PDFs are listed; try the whole-page fallback by supplying the parent page.</td></tr>
+      <tr><td>"report.xlsx is open in another program"</td><td>The workbook is open in Excel.</td><td>Close it and run again; other outputs were still written.</td></tr>
+      <tr><td>A PDF shows "No date found"</td><td>Metadata has no date, or the download is not a real PDF (e.g. an HTML error page).</td><td>The table tooltip says if the file could not be read; open it from the Date_Not_Found folder.</td></tr>
+      <tr><td>A document dated on the cutoff day counts as Updated</td><td>Comparison is against 00:00 on the cutoff day.</td><td>Use the next day as the cutoff if same-day edits should count as not updated.</td></tr>
+      <tr><td>Windows SmartScreen warning</td><td>The exe is not code-signed.</td><td>Choose <em>More info → Run anyway</em> after confirming the source.</td></tr>
+      <tr><td>The app does not start</td><td>Rare: blocked by security software.</td><td>Look at <code>%LOCALAPPDATA%\ASX PDF Checker\logs\crash.log</code>; allow-list the folder.</td></tr>
+      <tr><td>Notes page says the notes file could not be read</td><td>The file was damaged (for example edited by hand).</td><td>Nothing was overwritten: it was kept as <code>notes.corrupt-&lt;time&gt;.json</code> next to <code>notes.json</code> in <code>%LOCALAPPDATA%\ASX PDF Checker</code>; <code>notes.json.bak</code> may hold the last good copy.</td></tr>
+    </table>
+    <h3>Known limitations</h3>
+    <ul>
+      <li>One job at a time (a run or a date check).</li>
+      <li>The page fetch cannot be interrupted once started (up to 60 s); cancel takes effect right after it. A download stalled on the network can take up to 30 s to stop after Cancel.</li>
+      <li>History lists only runs made with the GUI (older CLI runs have no <code>run_summary.json</code>).</li>
+      <li>Dev / QA status columns in the workbook are edited in Excel, not in the app.</li>
+    </ul>
+  </section>
+
+  <!-- ============================ CHANGELOG ============================ -->
+  <section role="tabpanel" id="tab-changelog" aria-labelledby="btn-changelog">
+    <h2>Changelog</h2>
+    <p>Numbering: <code>MAJOR.FEATURE.FIX</code> — see Build &amp; release → Versioning.</p>
+    <h3>1.2.0</h3>
+    <ul>
+      <li><strong>Changed:</strong> "Project ID" is now <strong>DocumentId</strong> in the app, History, generated reports (<code>analysis_report.md</code>, <code>report.xlsx</code>), the command-line prompts and the docs. Stored data (<code>project_id</code>, folder names) is unchanged, so existing runs keep working.</li>
+      <li><strong>Added:</strong> optional <strong>Startpoint</strong> on New run, stored in the run summary and shown next to the DocumentId on Results, Running, History (new column) and the Date checker.</li>
+      <li><strong>Added:</strong> <strong>Notes</strong> page — create, read, update, delete notes with a heading and bold / italic / underline / colour text; search; unsaved-change prompts; per-user storage with atomic writes, a backup and corrupt-file recovery.</li>
+      <li><strong>Added:</strong> <strong>Agent 🤖</strong> page — animated "under construction, coming soon" placeholder.</li>
+      <li><strong>Added:</strong> written versioning rule (<code>MAJOR.FEATURE.FIX</code>) enforced by the docs check.</li>
+      <li><strong>Improved:</strong> the Start button stays visible on New run at the minimum window size; the watermark is fainter and cached.</li>
+    </ul>
+    <h3>1.1.0</h3>
+    <ul>
+      <li><strong>Changed:</strong> cutoff date is entered by typing (auto-dashes) or via the calendar; the quick-pick shortcuts were removed and the field starts blank. Applies to New run and Date checker.</li>
+      <li><strong>Fixed:</strong> calendar day numbers that were clipped or invisible (the app's table padding was leaking into the calendar grid); weekends no longer red-on-dark; calendar restyled for both themes.</li>
+      <li><strong>Added:</strong> developer note about deriving the cutoff from the Waivers section; "Close results" button and <kbd>Esc</kbd> on the Date checker; this documentation.</li>
+      <li><strong>Internal:</strong> data tables are styled via an explicit property instead of a global rule.</li>
+    </ul>
+    <h3>1.0.0</h3>
+    <ul>
+      <li>First desktop release: PySide6 GUI over the existing pipeline, live progress with cancel, Results dashboard (KPIs, donut, section bars, table), History, Date checker, dark/light themes.</li>
+      <li>Core refactor: Qt-free <code>core/</code> package, optional progress/cancel hooks, safe temp-file downloads, <code>run_summary.json</code>.</li>
+      <li>PyInstaller one-folder build with self-test and launch gates.</li>
+    </ul>
+  </section>
+  </main>
+</div>
+<footer>ASX Domain Ownership · CUBE — ASX PDF Checker documentation, v1.2.0</footer>
+
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  var panels = Array.prototype.slice.call(document.querySelectorAll('[role="tabpanel"]'));
+  function show(name, focus) {
+    var found = false;
+    tabs.forEach(function (t) {
+      var on = t.getAttribute('data-tab') === name;
+      found = found || on;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    });
+    if (!found) return show('overview', focus);
+    panels.forEach(function (p) { p.classList.toggle('active', p.id === 'tab-' + name); });
+    if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { show(t.getAttribute('data-tab'), false); });
+    t.addEventListener('keydown', function (e) {
+      var j = null;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') j = (i + 1) % tabs.length;
+      else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') j = 0; else if (e.key === 'End') j = tabs.length - 1;
+      if (j !== null) { e.preventDefault(); show(tabs[j].getAttribute('data-tab'), true); }
+    });
+  });
+  window.addEventListener('hashchange', function () { show(location.hash.slice(1), false); });
+  show(location.hash ? location.hash.slice(1) : 'overview', false);
+
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function stored() { try { return localStorage.getItem('asx-docs-theme'); } catch (e) { return null; } }
+  function apply(mode) { if (mode) root.setAttribute('data-theme', mode); else root.removeAttribute('data-theme'); }
+  apply(stored());
+  btn.addEventListener('click', function () {
+    var dark = root.getAttribute('data-theme') === 'dark' ||
+      (!root.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var next = dark ? 'light' : 'dark';
+    apply(next);
+    try { localStorage.setItem('asx-docs-theme', next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

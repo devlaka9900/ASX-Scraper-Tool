@@ -36,7 +36,9 @@ _BODY = {
     "alert":      '<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/>',
     "file_x":     '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M10 13l4 4M14 13l-4 4"/>',
     "layers":     '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>',
-    "logo":       '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9.5 15.5l2 2 3.5-4"/>',
+    "notes":      '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    "bot":        '<rect x="4" y="9" width="16" height="11" rx="3"/><path d="M12 5v4M9.5 14h.01M14.5 14h.01M9.5 17.2h5"/><circle cx="12" cy="4" r="1"/>',
+    "logo":'<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9.5 15.5l2 2 3.5-4"/>',
 }
 
 _cache: dict[tuple, QPixmap] = {}

@@ -40,7 +40,7 @@ def check_folder(
     base, downloads = resolve_folder(path)
     pdfs = sorted(downloads.rglob("*.pdf"))
 
-    known, source_run, source_url = _known_entries(base)   # from an earlier run, if any
+    known, source_run, source_url, source_startpoint = _known_entries(base)   # from an earlier run, if any
 
     entries: list[PDFEntry] = []
     seen: set[tuple[str, str]] = set()
@@ -86,6 +86,7 @@ def check_folder(
     meta = RunMeta(
         run_id=started.strftime("%Y%m%d_%H%M%S"),
         project_id=base.name,
+        startpoint=source_startpoint,
         url=source_url,
         cutoff=cutoff.strftime("%Y-%m-%d"),
         started_at=started.isoformat(timespec="seconds"),
@@ -110,16 +111,16 @@ def export_reports(result: RunResult) -> Path:
     return export_dir
 
 
-def _known_entries(base: Path) -> tuple[dict[tuple[str, str], PDFEntry], str | None, str]:
-    """(entries keyed by (section, filename), run_id, url) from <base>/run_summary.json.
+def _known_entries(base: Path) -> tuple[dict[tuple[str, str], PDFEntry], str | None, str, str]:
+    """(entries keyed by (section, filename), run_id, url, startpoint) from <base>/run_summary.json.
     Empty when there is no usable summary."""
     summary = base / SUMMARY_NAME
     if not summary.is_file():
-        return {}, None, ""
+        return {}, None, "", ""
     try:
         run = load_run(summary)
     except Exception as exc:  # corrupt/newer summary: fall back to filenames only
         log.warning("Ignoring unreadable summary %s: %s", summary, exc)
-        return {}, None, ""
+        return {}, None, "", ""
     entries = {(e.section, url_filename(e.url)): e for e in run.entries if e.url}
-    return entries, run.meta.run_id, run.meta.url
+    return entries, run.meta.run_id, run.meta.url, run.meta.startpoint
