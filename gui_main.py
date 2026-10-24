@@ -1,4 +1,4 @@
-"""ASX PDF Checker — desktop GUI entry point.
+"""ASX Reg Data — desktop GUI entry point.
 
     python gui_main.py            # normal start
     python gui_main.py --selftest # headless smoke test (used as the build gate)
@@ -47,7 +47,7 @@ def _install_crash_handlers() -> None:
         try:
             from PySide6.QtWidgets import QApplication, QMessageBox
             if QApplication.instance() is not None:
-                QMessageBox.critical(None, "ASX PDF Checker",
+                QMessageBox.critical(None, "ASX Reg Data",
                                      f"Unexpected error:\n\n{exc}\n\nDetails were saved to:\n{log_dir() / 'crash.log'}")
         except Exception:
             pass

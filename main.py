@@ -1,5 +1,5 @@
 """
-ASX PDF Checker
+ASX Reg Data
 ───────────────
 Scrapes an ASX rules/guidance/waivers page, downloads every PDF,
 identifies which were updated after a given cutoff date, and
@@ -37,7 +37,7 @@ console = Console()
 
 def main() -> None:
     console.print(Panel.fit(
-        "[bold cyan]ASX PDF Checker[/bold cyan]\n"
+        "[bold cyan]ASX Reg Data[/bold cyan]\n"
         "[dim]Scrape · Download · Analyse · Report[/dim]\n"
         "[dim]ASX Domain Ownership — binura.lakshan@cube.global[/dim]",
         border_style="cyan",

@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QLabel, QStackedWidget, QVBoxLayout, QWidget
+from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtWidgets import QApplication, QLabel, QStackedWidget, QVBoxLayout, QWidget
 
 from core.summary import RunResult
 from gui import icons, theme
@@ -47,7 +48,16 @@ class ResultsPage(QWidget):
         el.addLayout(row)
         el.addStretch(3)
 
+        self._empty = empty
         self.view = ResultsView()
+        self._close_btn = IconButton("Close results", "x")
+        self._close_btn.setToolTip("Close this result and go back to the empty state (Esc)")
+        self._close_btn.setAccessibleName("Close results")
+        self._close_btn.clicked.connect(self.close_results)
+        self.view.add_header_widget(self._close_btn)
+        # window-wide so Esc works wherever focus is on this page; _on_escape checks visibility
+        QShortcut(QKeySequence("Esc"), self, activated=self._on_escape,
+                  context=Qt.ShortcutContext.WindowShortcut)
         self._stack.addWidget(empty)
         self._stack.addWidget(self.view)
         theme.bus.changed.connect(self._refresh_icon)
@@ -63,3 +73,17 @@ class ResultsPage(QWidget):
     def show_result(self, result: RunResult, animate: bool = True) -> None:
         self.view.set_result(result, animate)
         self._stack.setCurrentWidget(self.view)
+
+    def close_results(self) -> None:
+        """Dismiss the shown result and go back to the empty state."""
+        self.view.clear()
+        self._stack.setCurrentWidget(self._empty)
+
+    def _on_escape(self) -> None:
+        if not (self.isVisible() and self._stack.currentWidget() is self.view):
+            return
+        search = self.view.search_box()
+        if QApplication.focusWidget() is search and search.text():
+            search.clear()                     # first Esc clears the search, it does not discard the result
+            return
+        self.close_results()

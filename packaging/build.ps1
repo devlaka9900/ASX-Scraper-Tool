@@ -1,15 +1,15 @@
 <#
-  Builds the ASX PDF Checker GUI: venv -> PyInstaller (onedir, windowed) in a STAGING folder
+  Builds the ASX Reg Data GUI: venv -> PyInstaller (onedir, windowed) in a STAGING folder
   -> self-test gate -> launch smoke test -> zip -> publish into dist\ (only when safe).
 
     powershell -ExecutionPolicy Bypass -File packaging\build.ps1
     powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -SkipSmoke
     powershell -ExecutionPolicy Bypass -File packaging\build.ps1 -PublishOnly   # re-publish the last staged build
 
-  The ready-to-run folder dist\ASX PDF Checker may be in use (someone runs the exe from it, and
-  their runs land in dist\ASX PDF Checker\output). So the build never touches it until the new build
+  The ready-to-run folder dist\ASX Reg Data may be in use (someone runs the exe from it, and
+  their runs land in dist\ASX Reg Data\output). So the build never touches it until the new build
   has passed every gate, and then only if the exe is not running; the user's output\ is carried over.
-  The zip dist\ASX_PDF_Checker_v<version>.zip is always produced; older zips are left alone.
+  The zip dist\ASX_Reg_Data_v<version>.zip is always produced; older zips are left alone.
 #>
 param(
     [string]$Version = "",
@@ -23,14 +23,14 @@ Set-Location $root
 if (-not $Version) {
     $Version = (Select-String -Path "core\version.py" -Pattern 'APP_VERSION\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
 }
-$name = "ASX PDF Checker"
+$name = "ASX Reg Data"
 if ($Version -notmatch '^\d+(\.\d+){0,3}$') { throw "-Version must be numeric like 1.2.3 or 1.2.3.4 (got '$Version')" }
 Write-Host "== $name v$Version ==" -ForegroundColor Cyan
 
 $stageRoot = Join-Path $root "build\stage"
 $stageApp  = Join-Path $stageRoot $name
 $distApp   = Join-Path $root "dist\$name"
-$zip       = Join-Path $root "dist\ASX_PDF_Checker_v$Version.zip"
+$zip       = Join-Path $root "dist\ASX_Reg_Data_v$Version.zip"
 
 function Test-AppRunning([string]$folder) {
     # any process started from a file inside $folder

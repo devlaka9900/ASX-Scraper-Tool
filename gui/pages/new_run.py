@@ -5,13 +5,14 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QScrollArea, QVBoxLayout, QWidget,
+    QCheckBox, QDialog, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QScrollArea, QVBoxLayout,
+    QWidget,
 )
 
 from core.pipeline import RunRequest
 from gui import icons, theme, validation
 from gui.settings import Settings
-from gui.widgets.common import IconButton, card, label, primary, repolish
+from gui.widgets.common import ElidedLabel, IconButton, card, divider, label, primary, repolish, secondary
 from gui.widgets.date_input import DateInput
 
 MAX_WIDTH = 760
@@ -251,9 +252,15 @@ class NewRunPage(QWidget):
             overwrite_downloads=self._redownload.isChecked(),
             startpoint=validation.clean_startpoint(self._startpoint.text()),
         )
+        if not self._confirm(req):            # Back to edit: nothing saved, form untouched
+            return
         self._settings.output_dir = req.output_root
         self._settings.remember_run(req.project_id, req.url, cutoff.strftime("%Y-%m-%d"))
         self.startRequested.emit(req)
+
+    def _confirm(self, req: RunRequest) -> bool:
+        """Show the entered details for review; True = start the run (patchable in tests)."""
+        return RunConfirmDialog(req, self.window()).exec() == QDialog.DialogCode.Accepted
 
     def set_busy(self, busy: bool) -> None:
         self._busy = busy
@@ -266,3 +273,57 @@ class NewRunPage(QWidget):
     def _refresh_note_icon(self) -> None:
         self._note_icon.setPixmap(icons.pixmap("alert", theme.current()["accent_ink"], 20,
                                                self.devicePixelRatioF(), 1.8))
+
+
+class RunConfirmDialog(QDialog):
+    """Read-only summary of a RunRequest: Accepted = start the run, Rejected = back to the form."""
+
+    def __init__(self, req: RunRequest, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Confirm run")
+        self.setModal(True)
+        self.setMinimumWidth(560)
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(24, 22, 24, 20)
+        lay.setSpacing(14)
+        lay.addWidget(label("Confirm run", "h1"))
+        lay.addWidget(label("Check the details below, then start the run.", "secondary", wrap=True))
+
+        box = card("flat")
+        grid = QGridLayout(box)
+        grid.setContentsMargins(16, 14, 16, 14)
+        grid.setHorizontalSpacing(18)
+        grid.setVerticalSpacing(8)
+        grid.setColumnStretch(1, 1)
+        rows = (
+            ("DocumentId", req.project_id),
+            ("Startpoint", req.startpoint or "—"),
+            ("Page URL", req.url),
+            ("Cutoff date", req.cutoff.strftime("%Y-%m-%d")),
+            ("Output folder", str(req.output_root)),
+            ("Re-download", "Yes" if req.overwrite_downloads else "No"),
+        )
+        for i, (name, value) in enumerate(rows):
+            grid.addWidget(label(name, "h3"), i, 0, Qt.AlignmentFlag.AlignTop)
+            val = ElidedLabel(value)
+            val.setAccessibleName(f"{name} value")
+            grid.addWidget(val, i, 1)
+        lay.addWidget(box)
+        lay.addWidget(divider())
+
+        foot = QHBoxLayout()
+        foot.setSpacing(10)
+        foot.addStretch(1)
+        back = secondary("Back to edit")
+        back.setAccessibleName("Back to edit")
+        back.clicked.connect(self.reject)
+        self._confirm_btn = primary("Confirm and start", "play")
+        self._confirm_btn.setAccessibleName("Confirm and start")
+        self._confirm_btn.setMinimumHeight(40)
+        self._confirm_btn.setDefault(True)
+        self._confirm_btn.clicked.connect(self.accept)
+        foot.addWidget(back)
+        foot.addWidget(self._confirm_btn)
+        lay.addLayout(foot)
+        self._confirm_btn.setFocus()

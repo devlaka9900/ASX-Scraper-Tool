@@ -8,5 +8,5 @@ Bump it here, add a Changelog entry in docs/index.html (tools/docs_check.py enfo
 and run packaging/build.ps1.
 """
 
-APP_NAME = "ASX PDF Checker"
+APP_NAME = "ASX Reg Data"
 APP_VERSION = "1.2.0"

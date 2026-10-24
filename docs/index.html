@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ASX PDF Checker — Documentation</title>
+<title>ASX Reg Data — Documentation</title>
 <style>
   :root {
     --bg: #f9f9f7; --surface: #fcfcfb; --surface2: #f3f3f0; --border: #e1e0d9; --border-strong: #c3c2b7;
@@ -77,7 +77,7 @@
 </head>
 <body>
 <header class="top">
-  <h1>ASX PDF Checker</h1><span class="ver">Documentation · v1.2.0</span><span class="sp"></span>
+  <h1>ASX Reg Data</h1><span class="ver">Documentation · v1.2.0</span><span class="sp"></span>
   <button class="theme" id="themeBtn" type="button" aria-label="Toggle colour theme">Theme</button>
 </header>
 
@@ -101,7 +101,7 @@
   <!-- ============================ OVERVIEW ============================ -->
   <section role="tabpanel" id="tab-overview" aria-labelledby="btn-overview" class="active">
     <h2>Overview</h2>
-    <p class="lead">ASX PDF Checker finds out which documents on an ASX rules / guidance-notes / waivers page were updated after a given cutoff date, and produces the evidence: sorted PDF folders, markdown reports and an Excel workbook.</p>
+    <p class="lead">ASX Reg Data finds out which documents on an ASX rules / guidance-notes / waivers page were updated after a given cutoff date, and produces the evidence: sorted PDF folders, markdown reports and an Excel workbook.</p>
 
     <div class="grid">
       <div class="card"><strong>1 · Scrape</strong><br>Reads the page, finds every PDF link per tab (Rules, Guidance notes, Waivers, Appendices…).</div>
@@ -112,7 +112,7 @@
 
     <h3>Two front-ends, one core</h3>
     <ul>
-      <li><strong>Desktop app</strong> (<code>gui_main.py</code>, or the packaged <code>ASX PDF Checker.exe</code>): New run, live Running view, Results dashboard, History, Date checker, Notes and the Agent placeholder; dark and light themes.</li>
+      <li><strong>Desktop app</strong> (<code>gui_main.py</code>, or the packaged <code>ASX Reg Data.exe</code>): New run, live Running view, Results dashboard, History, Date checker, Notes and the Agent placeholder; dark and light themes.</li>
       <li><strong>Command line</strong> (<code>python main.py</code>, <code>python check_pdf_dates.py</code>): same behaviour as before the GUI existed; only the "Project ID" prompt and summary wording became "DocumentId".</li>
     </ul>
 
@@ -152,7 +152,7 @@
 
     <h3>1. Introduction</h3>
     <h4>1.1 Purpose</h4>
-    <p>Specify the behaviour of ASX PDF Checker so that analysts, developers and QA share one definition of "done".</p>
+    <p>Specify the behaviour of ASX Reg Data so that analysts, developers and QA share one definition of "done".</p>
     <h4>1.2 Scope</h4>
     <p>The product retrieves the PDFs published on an ASX regulation page, determines which changed after a cutoff date, and exports reports. It does not edit, convert or publish documents, and it does not talk to any system other than the ASX website.</p>
     <h4>1.3 Definitions</h4>
@@ -213,7 +213,7 @@
     <h3>5. External interfaces</h3>
     <ul>
       <li><strong>User interface:</strong> desktop window (Qt), see User guide.</li>
-      <li><strong>File system:</strong> reads/writes the output folder; logs in <code>%LOCALAPPDATA%\ASX PDF Checker\logs</code>.</li>
+      <li><strong>File system:</strong> reads/writes the output folder; logs in <code>%LOCALAPPDATA%\ASX Reg Data\logs</code>.</li>
       <li><strong>Network:</strong> HTTP(S) GET to the page URL you enter and to the PDF links on that page — normally all on <code>www.asx.com.au</code>. Nothing else is contacted.</li>
       <li><strong>Registry:</strong> per-user settings under <code>HKCU\Software\CUBE\ASXPDFChecker</code> (QSettings).</li>
     </ul>
@@ -260,9 +260,9 @@
 
     <h3>To run the packaged app</h3>
     <ul>
-      <li>Windows 11 (tested) or Windows 10 1809 and later, 64-bit. Nothing to install; unzip and start <code>ASX PDF Checker.exe</code>.</li>
+      <li>Windows 11 (tested) or Windows 10 1809 and later, 64-bit. Nothing to install; unzip and start <code>ASX Reg Data.exe</code>.</li>
       <li>Internet access to <code>www.asx.com.au</code> over HTTPS (corporate proxies with TLS inspection are supported via an automatic fallback).</li>
-      <li>A writable output folder (default: <code>output</code> next to the exe, otherwise <code>Documents\ASX PDF Checker\output</code>).</li>
+      <li>A writable output folder (default: <code>output</code> next to the exe, otherwise <code>Documents\ASX Reg Data\output</code>).</li>
       <li>About 150 MB of disk for the app plus space for the downloaded PDFs.</li>
     </ul>
 
@@ -386,7 +386,7 @@ python gui_main.py</code></pre>
    ├─ run_summary.json                 latest run (GUI runs)
    ├─ history/run_&lt;YYYYMMDD_HHMMSS&gt;.json   one archive per run (feeds History)
    └─ date_checks/&lt;cutoff&gt;_&lt;time&gt;/    optional Date checker exports</code></pre>
-    <p>Logs: <code>%LOCALAPPDATA%\ASX PDF Checker\logs\asx_checker.log</code> (rotating) and <code>crash.log</code> for unexpected errors.</p>
+    <p>Logs: <code>%LOCALAPPDATA%\ASX Reg Data\logs\asx_checker.log</code> (rotating) and <code>crash.log</code> for unexpected errors.</p>
 
     <h3>report.xlsx</h3>
     <ul>
@@ -426,7 +426,7 @@ python gui_main.py</code></pre>
     </ul>
 
     <h3>notes.json (Notes)</h3>
-    <p>Location: <code>%LOCALAPPDATA%\ASX PDF Checker\notes.json</code> — one file per Windows user, not shared and not part of the app folder, so it survives updates.</p>
+    <p>Location: <code>%LOCALAPPDATA%\ASX Reg Data\notes.json</code> — one file per Windows user, not shared and not part of the app folder, so it survives updates.</p>
 <pre><code>{
   "schema_version": 1,
   "notes": [ { "id": "3f2a…", "title": "Release checklist",
@@ -512,8 +512,8 @@ python gui_main.py</code></pre>
       <li>Runs PyInstaller with <code>packaging/asx_pdf_checker.spec</code>: one-folder, windowed, no UPX, unused Qt modules excluded.</li>
       <li><strong>Gate 1 — self-test:</strong> runs the exe with <code>--selftest</code> (imports, PDF round trip, scraper parse, reports and summary round trip, notes store and sanitizer, renders every page in both themes). A failure stops the build.</li>
       <li><strong>Gate 2 — launch test:</strong> starts the exe, requires a main window after 8 s, closes it like a user, and requires exit code 0 and no growth of <code>crash.log</code>.</li>
-      <li>Copies <code>docs/</code> next to the exe and zips the staged folder to <code>dist\ASX_PDF_Checker_v&lt;version&gt;.zip</code>. Older release zips are left alone.</li>
-      <li><strong>Publish:</strong> only after every gate has passed, <code>dist\ASX PDF Checker</code> is refreshed from the verified build. The build itself happens in <code>build\stage</code>, so a running copy in <code>dist</code> is never disturbed: if the exe is running from <code>dist</code>, publishing is skipped with a message (the zip is still complete) and can be done later with <code>build.ps1 -PublishOnly</code>. A user's own <code>dist\ASX PDF Checker\output</code> folder (where runs land when the exe is started from there) is moved aside while publishing and restored afterwards.</li>
+      <li>Copies <code>docs/</code> next to the exe and zips the staged folder to <code>dist\ASX_Reg_Data_v&lt;version&gt;.zip</code>. Older release zips are left alone.</li>
+      <li><strong>Publish:</strong> only after every gate has passed, <code>dist\ASX Reg Data</code> is refreshed from the verified build. The build itself happens in <code>build\stage</code>, so a running copy in <code>dist</code> is never disturbed: if the exe is running from <code>dist</code>, publishing is skipped with a message (the zip is still complete) and can be done later with <code>build.ps1 -PublishOnly</code>. A user's own <code>dist\ASX Reg Data\output</code> folder (where runs land when the exe is started from there) is moved aside while publishing and restored afterwards.</li>
     </ol>
     <h3>Versioning</h3>
     <p>Releases are numbered <code>MAJOR.FEATURE.FIX</code> — for example <code>v1.2.0</code>:</p>
@@ -529,7 +529,7 @@ python gui_main.py</code></pre>
     <ol>
       <li>Choose the next number with the rule above, set <code>APP_VERSION</code> in <code>core/version.py</code>, add an entry to the Changelog tab of this file and update the version in its header/footer (<code>tools/docs_check.py</code> fails the build if it is missing).</li>
       <li>Run the test scripts (Testing &amp; QA), then <code>build.ps1</code>.</li>
-      <li>Optional live check of the packaged exe: set <code>ASX_SELFTEST_URL</code> to an ASX page and run <code>"ASX PDF Checker.exe" --selftest</code>; the log must report a scrape count.</li>
+      <li>Optional live check of the packaged exe: set <code>ASX_SELFTEST_URL</code> to an ASX page and run <code>"ASX Reg Data.exe" --selftest</code>; the log must report a scrape count.</li>
       <li>Hand over the zip. The exe is unsigned, so Windows SmartScreen may show "Run anyway".</li>
     </ol>
     <h3>Packaging notes</h3>
@@ -596,8 +596,8 @@ python gui_main.py</code></pre>
       <tr><td>A PDF shows "No date found"</td><td>Metadata has no date, or the download is not a real PDF (e.g. an HTML error page).</td><td>The table tooltip says if the file could not be read; open it from the Date_Not_Found folder.</td></tr>
       <tr><td>A document dated on the cutoff day counts as Updated</td><td>Comparison is against 00:00 on the cutoff day.</td><td>Use the next day as the cutoff if same-day edits should count as not updated.</td></tr>
       <tr><td>Windows SmartScreen warning</td><td>The exe is not code-signed.</td><td>Choose <em>More info → Run anyway</em> after confirming the source.</td></tr>
-      <tr><td>The app does not start</td><td>Rare: blocked by security software.</td><td>Look at <code>%LOCALAPPDATA%\ASX PDF Checker\logs\crash.log</code>; allow-list the folder.</td></tr>
-      <tr><td>Notes page says the notes file could not be read</td><td>The file was damaged (for example edited by hand).</td><td>Nothing was overwritten: it was kept as <code>notes.corrupt-&lt;time&gt;.json</code> next to <code>notes.json</code> in <code>%LOCALAPPDATA%\ASX PDF Checker</code>; <code>notes.json.bak</code> may hold the last good copy.</td></tr>
+      <tr><td>The app does not start</td><td>Rare: blocked by security software.</td><td>Look at <code>%LOCALAPPDATA%\ASX Reg Data\logs\crash.log</code>; allow-list the folder.</td></tr>
+      <tr><td>Notes page says the notes file could not be read</td><td>The file was damaged (for example edited by hand).</td><td>Nothing was overwritten: it was kept as <code>notes.corrupt-&lt;time&gt;.json</code> next to <code>notes.json</code> in <code>%LOCALAPPDATA%\ASX Reg Data</code>; <code>notes.json.bak</code> may hold the last good copy.</td></tr>
     </table>
     <h3>Known limitations</h3>
     <ul>
@@ -637,7 +637,7 @@ python gui_main.py</code></pre>
   </section>
   </main>
 </div>
-<footer>ASX Domain Ownership · CUBE — ASX PDF Checker documentation, v1.2.0</footer>
+<footer>ASX Domain Ownership · CUBE — ASX Reg Data documentation, v1.2.0</footer>
 
 <script>
 (function () {

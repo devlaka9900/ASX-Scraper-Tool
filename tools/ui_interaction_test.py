@@ -46,6 +46,22 @@ win = MainWindow(settings, notes_path=NOTES_PATH)
 win.resize(1280, 820)
 win.show()
 
+from core.paths import data_dir, documents_dir  # noqa: E402
+from core.version import APP_NAME  # noqa: E402
+from PySide6.QtWidgets import QLabel as _QLabel  # noqa: E402
+check(APP_NAME == "ASX Reg Data" and win.windowTitle() == "ASX Reg Data", f"window title / APP_NAME is {win.windowTitle()!r}")
+_real_lad = os.environ.get("LOCALAPPDATA")
+os.environ["LOCALAPPDATA"] = tempfile.mkdtemp(prefix="asx_lad_")          # data_dir() creates the folder: keep it in temp
+try:
+    _dd_name = data_dir().name
+finally:
+    if _real_lad is None:
+        os.environ.pop("LOCALAPPDATA", None)
+    else:
+        os.environ["LOCALAPPDATA"] = _real_lad
+check(_dd_name == "ASX Reg Data" and documents_dir().name == "ASX Reg Data", "data and documents folders are named 'ASX Reg Data'")
+check(any(l.text() == APP_NAME for l in win.sidebar.findChildren(_QLabel)), "sidebar shows the app name")
+
 demo = make_demo_result(240)
 win.results.show_result(demo, animate=False)
 win.navigate("results")
@@ -139,10 +155,73 @@ check("Waivers" in _nr.DEV_NOTE and any("Developer note" == w.text() for w in pa
 got = []
 win.runner.start_run = lambda req: None     # do not launch a real job from the form test
 page.startRequested.connect(got.append)
+page._confirm = lambda req: True            # the real confirm dialog is modal; it is tested separately below
 QTest.mouseClick(page._start, Qt.MouseButton.LeftButton)
 check(len(got) == 1 and got[0].project_id == "My-Project_1" and got[0].url.endswith("/page")
       and got[0].cutoff == datetime(2024, 1, 15), "Start emits a RunRequest with the typed cutoff")
 check(settings.last_project_id == "My-Project_1", "inputs remembered in settings")
+
+# ---- v1.3.0: New Run confirmation dialog ----------------------------------------------------------------------
+from PySide6.QtWidgets import QDialog  # noqa: E402
+from core.pipeline import RunRequest as _RR  # noqa: E402
+from gui.pages.new_run import RunConfirmDialog  # noqa: E402
+from gui.widgets.common import ElidedLabel as _EL  # noqa: E402
+
+seen: list = []
+page._confirm = lambda req: (seen.append(req) or False)          # user picks "Back to edit"
+got.clear()
+page._project.setText("BACK-1")
+page._url.setText("https://www.asx.com.au/back")
+fields_before = (page._project.text(), page._url.text(), page._cutoff.text(), page._output.text(), page._startpoint.text())
+out_before, last_before = settings.output_dir, settings.last_project_id
+page._submit()
+check(len(seen) == 1 and not got, "Back to edit: the confirmation was shown but startRequested is NOT emitted")
+check(settings.output_dir == out_before and settings.last_project_id == last_before == "My-Project_1",
+      "Back to edit: settings (output dir, last DocumentId) are unchanged")
+check((page._project.text(), page._url.text(), page._cutoff.text(), page._output.text(), page._startpoint.text()) == fields_before
+      and page._start.isEnabled(), "Back to edit: the form keeps its text and Start stays enabled")
+
+seen.clear()
+page._confirm = lambda req: (seen.append(req) or True)           # user picks "Confirm & start"
+page._submit()
+check(len(seen) == 1 and len(got) == 1 and got[0] is seen[0] and got[0].project_id == "BACK-1",
+      "Confirm: _confirm called once with the request, then startRequested is emitted with it")
+check(settings.last_project_id == "BACK-1", "Confirm: inputs are remembered only after confirming")
+got.clear()
+
+# the real dialog: contents + buttons
+req_full = _RR("DOC-Z", "https://www.asx.com.au/some/very/long/page", datetime(2025, 3, 7), Path(tempfile.gettempdir()),
+               overwrite_downloads=True, startpoint="Chapter 5")
+dlg = RunConfirmDialog(req_full)
+def dval(d, name):
+    w = next((x for x in d.findChildren(_EL) if x.accessibleName() == name), None)
+    return w.full_text() if w is not None else None
+check(dlg.windowTitle() == "Confirm run" and dlg.isModal(), "confirm dialog is a modal 'Confirm run' window")
+check(dval(dlg, "DocumentId value") == "DOC-Z" and dval(dlg, "Startpoint value") == "Chapter 5"
+      and dval(dlg, "Page URL value") == req_full.url and dval(dlg, "Cutoff date value") == "2025-03-07"
+      and dval(dlg, "Output folder value") == str(req_full.output_root) and dval(dlg, "Re-download value") == "Yes",
+      "confirm dialog shows DocumentId, Startpoint, Page URL, Cutoff date, Output folder, Re-download")
+req_min = _RR("DOC-Y", "https://x", datetime(2025, 3, 7), Path("."), overwrite_downloads=False, startpoint="")
+dlg2 = RunConfirmDialog(req_min)
+check(dval(dlg2, "Startpoint value") == "—" and dval(dlg2, "Re-download value") == "No",
+      "confirm dialog shows '—' for an empty Startpoint and 'No' for Re-download off")
+btns = {b.text(): b for b in dlg2.findChildren(QPushButton)}
+check({"Back to edit", "Confirm and start"} <= set(btns) and dlg2._confirm_btn.isDefault(),
+      "confirm dialog has 'Back to edit' and a default 'Confirm and start' button")
+btns["Back to edit"].click()
+check(dlg2.result() == QDialog.DialogCode.Rejected, "clicking 'Back to edit' rejects the dialog")
+dlg3 = RunConfirmDialog(req_min)
+dlg3._confirm_btn.click()
+check(dlg3.result() == QDialog.DialogCode.Accepted, "clicking 'Confirm & start' accepts the dialog")
+
+# NewRunPage._confirm wires the dialog result through (patched exec, no real modal loop)
+real_dlg_exec = RunConfirmDialog.exec
+page2_ = type(page)  # the unbound method under test
+for outcome, expect in ((QDialog.DialogCode.Accepted, True), (QDialog.DialogCode.Rejected, False)):
+    RunConfirmDialog.exec = lambda self, o=outcome: o
+    check(page2_._confirm(page, req_min) is expect, f"_confirm returns {expect} when the dialog is {outcome.name}")
+RunConfirmDialog.exec = real_dlg_exec
+page._confirm = lambda req: True                                 # keep stubbing for the flows below
 
 # ---- theme toggle ------------------------------------------------------------------------------
 was_dark = theme.current().is_dark
@@ -189,6 +268,36 @@ win.activateWindow()
 app.processEvents()
 QTest.keyClick(win, Qt.Key.Key_Escape)
 check(dc._stack.currentWidget() is dc._placeholder, "Esc closes the result view")
+
+# Results page: Close results button + Esc return to the empty state
+rp = win.results
+rp.show_result(make_demo_result(30), animate=False)
+win.navigate("results")
+app.processEvents()
+check(rp.has_result() and rp._stack.currentWidget() is rp.view and rp._close_btn.isVisible(),
+      "Results shows a Close results button with a result open")
+QTest.mouseClick(rp._close_btn, Qt.MouseButton.LeftButton)
+check(not rp.has_result() and rp._stack.currentWidget() is rp._empty and rp.view.result is None
+      and rp.view._proxy.rowCount() == 0, "Close results clears the result and shows the empty state")
+rp.show_result(make_demo_result(30), animate=False)
+check(rp._stack.currentWidget() is rp.view and rp.view._proxy.rowCount() == 30, "a new result after closing shows the result view again")
+win.activateWindow()
+app.processEvents()
+QTest.keyClick(win, Qt.Key.Key_Escape)
+check(rp._stack.currentWidget() is rp._empty and not rp.has_result(), "Esc closes the Results result view")
+QTest.keyClick(win, Qt.Key.Key_Escape)
+check(rp._stack.currentWidget() is rp._empty, "Esc on the empty Results state does nothing")
+rp.show_result(make_demo_result(30), animate=False)
+rp.view.search_box().setText("waiver")
+rp.view.search_box().setFocus()
+win.activateWindow()
+app.processEvents()
+QTest.keyClick(win, Qt.Key.Key_Escape)
+check(rp._stack.currentWidget() is rp.view and rp.view.search_box().text() == "",
+      "first Esc clears the Results search box without closing the result")
+QTest.keyClick(win, Qt.Key.Key_Escape)
+check(rp._stack.currentWidget() is rp._empty, "second Esc closes the Results result")
+rp.show_result(make_demo_result(240), animate=False)      # restore what the following checks expect
 
 # review fixes: partial dates are not dates, caret stays put, tab order, Esc vs search box
 check(parse_date("2024-12-3") is None and parse_date("2024-1-05") is None and parse_date(" 2024-12-31 ") is not None,
@@ -328,6 +437,32 @@ check("DocumentId" in heads and "Startpoint" in heads and heads.index("Startpoin
       f"History headers: {heads}")
 cells = {tbl.item(r, heads.index("DocumentId")).text(): tbl.item(r, heads.index("Startpoint")).text() for r in range(tbl.rowCount())}
 check(cells.get("DOC-A") == "Chapter 5" and cells.get("DOC-B") == "—", f"History startpoint cells {cells}")
+check("Pages updated" in heads and "Total pages" in heads and heads.index("Pages updated") == heads.index("PDFs") + 1
+      and heads.index("Total pages") == heads.index("Pages updated") + 1, "History has 'Pages updated' and 'Total pages' columns after PDFs")
+r_doc = {tbl.item(r, heads.index("DocumentId")).text(): r for r in range(tbl.rowCount())}
+want = make_demo_result(12).stats
+okc = all(tbl.item(r_doc[d], heads.index("Pages updated")).text() == f"{want['updated_pages']:,}"
+          and tbl.item(r_doc[d], heads.index("Total pages")).text() == f"{want['total_pages']:,}" for d in ("DOC-A", "DOC-B"))
+check(okc and want["total_pages"] > 0, f"History page-count cells match the stored stats ({want['updated_pages']:,} / {want['total_pages']:,})")
+align = tbl.item(r_doc["DOC-A"], heads.index("Total pages")).textAlignment()
+check(bool(align & int(Qt.AlignmentFlag.AlignRight)), "page-count cells are right-aligned")
+# older history files have no page counts -> 0
+import json as _json  # noqa: E402
+old_root = Path(tempfile.mkdtemp(prefix="asx_hist_old_"))
+r_old = make_demo_result(5, base_dir=old_root / "DOC-OLD")
+r_old.meta.project_id, r_old.meta.run_id, r_old.meta.started_at = "DOC-OLD", "20261003_100000", "2026-10-03T10:00:00"
+(old_root / "DOC-OLD").mkdir(parents=True)
+write_summary(r_old)
+for jf in (old_root / "DOC-OLD").rglob("run_*.json"):
+    d_ = _json.loads(jf.read_text(encoding="utf-8"))
+    d_["stats"].pop("updated_pages", None)
+    d_["stats"].pop("total_pages", None)
+    jf.write_text(_json.dumps(d_), encoding="utf-8")
+settings.add_history_root(old_root)
+win.history.refresh()
+r_doc = {tbl.item(r, heads.index("DocumentId")).text(): r for r in range(tbl.rowCount())}
+check("DOC-OLD" in r_doc and tbl.item(r_doc["DOC-OLD"], heads.index("Pages updated")).text() == "0"
+      and tbl.item(r_doc["DOC-OLD"], heads.index("Total pages")).text() == "0", "a history file without page counts shows 0 / 0")
 dc.refresh_runs()
 check(any("DOC-A  ·  Chapter 5" in dc._runs.itemText(i) for i in range(dc._runs.count())), "Date checker run picker shows the Startpoint")
 
@@ -359,17 +494,29 @@ check(not win.agent.hero.running and win.agent.hero.phase == phase_before, "redu
 check(mv.state() != QMovie.MovieState.Running and mv.currentFrameNumber() == 0, "reduced motion: robot GIF shows frame 0 and does not play")
 win.navigate("history")
 
-# ---- Notes: full CRUD through the widgets ------------------------------------------------------------------------
+# ---- Notes: list page, read-only viewer, editor ---------------------------------------------------------------------
 from gui.notes_html import document_to_html, sanitize_html  # noqa: E402
-from gui.pages.notes import NOTE_ROLE  # noqa: E402
+from gui.pages.notes import NOTE_ROLE, NoteViewDialog  # noqa: E402
 notes = win.notes
-check(notes.current_id() is None and notes._stack.currentWidget() is notes._empty, "Notes starts with the empty state")
+check(notes.current_id() is None and notes._stack.currentWidget() is notes._list_page
+      and notes._list_stack.currentWidget() is notes._empty and notes._empty_title.text() == "No notes yet",
+      "Notes starts on the list page with the 'No notes yet' empty state")
 
 real_exec, real_question = QMessageBox.exec, QMessageBox.question
 def answer_exec(button):
     QMessageBox.exec = lambda self: button
 def answer_question(button):
     QMessageBox.question = staticmethod(lambda *a, **k: button)
+
+# the viewer is modal: stub exec() so it records the dialog and reports the button the "user" pressed
+real_view_exec = NoteViewDialog.exec
+viewers: list = []
+def answer_viewer(action):
+    def fake(self, a=action):
+        viewers.append(self)
+        self.action = a
+        return 1 if a else 0
+    NoteViewDialog.exec = fake
 
 win.navigate("notes")
 notes.new_note()
@@ -385,7 +532,8 @@ cur.setPosition(6); cur.setPosition(11, QTextCursor.MoveMode.KeepAnchor)
 notes._body.setTextCursor(cur)
 notes._apply_italic(True); notes._apply_underline(True); notes._apply_color("#e5484d")
 check(notes._dirty and notes._status.text() == "Unsaved changes", "editing marks the note as unsaved")
-check(notes.save() is True and not notes._dirty, "Save succeeds")
+check(notes.save() is True and not notes._dirty and notes._stack.currentWidget() is notes._editor,
+      "save() succeeds and stays on the editor")
 n_id = notes.current_id()
 saved = notes._store.get(n_id)
 check(n_id and saved.title == "Alpha heading" and saved.body_text == "hello brave world", "note stored with heading and text")
@@ -393,14 +541,36 @@ check("<b>hello</b>" in saved.body_html and "<i>" in saved.body_html and "<u>" i
       and 'color:#e5484d' in saved.body_html, f"bold / italic / underline / colour persisted: {saved.body_html}")
 check(notes._list.count() == 1 and notes._count.text() == "1 note", "list shows the new note")
 
-# Read: a fresh page over the same file renders the same formatting and a stable round trip
+# Save button / Ctrl+S: save, then return to the list
+notes._title.setText("Alpha heading!")
+notes._save_btn.click()
+check(notes._stack.currentWidget() is notes._list_page and notes.current_id() is None and not notes._dirty
+      and notes._store.get(n_id).title == "Alpha heading!", "Save button saves and returns to the list")
+notes._store.update(n_id, title="Alpha heading")
+notes._populate()
+notes.edit_note(n_id)
+check(notes._stack.currentWidget() is notes._editor and not notes._dirty, "edit_note opens the stored note in the editor")
+notes._save_and_close()
+check(notes._stack.currentWidget() is notes._editor, "Save is a no-op while the note is clean")
+notes._title.setText("Alpha shortcut")
+notes._save_and_close()                                   # what Ctrl+S is wired to
+check(notes._stack.currentWidget() is notes._list_page and notes._store.get(n_id).title == "Alpha shortcut",
+      "Ctrl+S path (_save_and_close) saves and returns to the list")
+notes._store.update(n_id, title="Alpha heading")
+notes._populate()
+
+# Read: a fresh page over the same file lands on the list and renders the same formatting (round trip)
 from core.notes import NotesStore  # noqa: E402
 from gui.pages.notes import NotesPage  # noqa: E402
 page2 = NotesPage(NotesStore(NOTES_PATH))
-check(page2.current_id() == n_id and page2._title.text() == "Alpha heading", "reopened Notes page loads the saved note")
-check(document_to_html(page2._body.document()) == saved.body_html, "formatting round-trips unchanged through load -> serialise")
+check(page2._stack.currentWidget() is page2._list_page and page2.current_id() is None and page2._list.count() == 1,
+      "reopened Notes page lists the saved note and opens on the list")
+page2.edit_note(n_id)
+check(page2._title.text() == "Alpha heading" and document_to_html(page2._body.document()) == notes._store.get(n_id).body_html,
+      "formatting round-trips unchanged through load -> serialise")
 
-# Update
+# Update (from the editor)
+notes.edit_note(n_id)
 notes._title.setText("Alpha renamed")
 check(notes._dirty, "changing the heading marks the note unsaved")
 check(notes.save() and notes._store.get(n_id).title == "Alpha renamed" and notes._list.count() == 1, "Update keeps one note, new heading")
@@ -423,49 +593,147 @@ notes._title.setText("Gamma")
 notes._body.setPlainText("third")
 notes.save()
 check(len(notes._store) == 3 and notes._list.count() == 3, "three notes listed")
+ids = {n.title: n.id for n in notes._store.list()}
 
-# Search
+# Search (the search box lives on the list page)
+notes.back_to_list()
 notes._search.setText("brave")
 QTest.qWait(220)
 check(notes._list.count() == 1 and "of 3" in notes._count.text(), f"search filters the list ({notes._count.text()})")
+notes._search.setText("zzzz-nothing")
+QTest.qWait(220)
+check(notes._list.count() == 0 and notes._list_stack.currentWidget() is notes._empty
+      and notes._empty_title.text() == "No matching notes", "a search with no match shows 'No matching notes'")
 notes._search.clear()
 QTest.qWait(220)
-check(notes._list.count() == 3, "clearing the search restores the list")
+check(notes._list.count() == 3 and notes._list_stack.currentWidget() is notes._list, "clearing the search restores the list")
 
-# Switching notes with unsaved edits asks first
-notes._list.setCurrentRow(0)
-cur_id = notes.current_id()
+# Viewer: a click opens a read-only dialog and does NOT switch to the editor
+row_alpha = next(r for r in range(notes._list.count()) if notes._list.item(r).data(NOTE_ROLE).id == n_id)
+answer_viewer(None)                                       # user presses Close
+viewers.clear()
+notes._list.itemClicked.emit(notes._list.item(row_alpha))
+check(len(viewers) == 1 and viewers[0]._title.text() == "Alpha renamed" and viewers[0]._body.isReadOnly()
+      and notes._stack.currentWidget() is notes._list_page and notes.current_id() is None and not notes._viewing,
+      "clicking a note opens the read-only viewer and stays on the list")
+viewers.clear()
+notes._list.itemActivated.emit(notes._list.item(row_alpha))
+check(len(viewers) == 1, "Enter (itemActivated) also opens the viewer")
+viewers.clear()
+notes._viewing = True
+notes.view_note(n_id)
+notes._viewing = False
+check(not viewers, "a second viewer is not opened while one is already open")
+dlg_n = NoteViewDialog(notes._store.get(n_id))
+check({b.text() for b in dlg_n.findChildren(QPushButton)} >= {"Edit", "Close", "Delete"}
+      and "Created" in dlg_n._meta.text() and "Updated" in dlg_n._meta.text(),
+      "viewer has Edit / Delete / Close and shows created / updated times")
+check(dlg_n.action is None, "viewer action is None until a button is used")
+dlg_n._close_btn.click()
+check(dlg_n.action is None, "viewer Close leaves action as None")
+dlg_n._edit_btn.click()
+check(dlg_n.action == "edit", "viewer Edit sets action 'edit'")
+hostile_note = notes._store.create(
+    "Hostile", '<p style="font-size:44pt;font-family:Comic Sans MS"><img src="C:/x.png"><a href="http://evil">z</a>ok</p>', "ok")
+dlg_h = NoteViewDialog(hostile_note)
+shown = document_to_html(dlg_h._body.document())
+check(dlg_h._body.isReadOnly() and "img" not in shown and "href" not in shown and "font" not in shown
+      and "ok" in dlg_h._body.toPlainText(), f"viewer body is read-only and sanitised ({shown})")
+notes._store.delete(hostile_note.id)
+notes._populate()
+# viewer Edit -> editor
+answer_viewer("edit")
+notes.view_note(n_id)
+check(notes._stack.currentWidget() is notes._editor and notes.current_id() == n_id and notes._title.text() == "Alpha renamed",
+      "viewer Edit opens that note in the editor")
+# viewer Delete -> confirmation -> removed, still on the list
+notes.back_to_list()
+answer_viewer("delete")
+answer_question(QMessageBox.StandardButton.No)
+notes.view_note(ids["Gamma"])
+check(notes._store.get(ids["Gamma"]) is not None and len(notes._store) == 3, "viewer Delete answered No keeps the note")
+answer_question(QMessageBox.StandardButton.Yes)
+notes.view_note(ids["Gamma"])
+check(notes._store.get(ids["Gamma"]) is None and len(notes._store) == 2 and notes._list.count() == 2
+      and notes._stack.currentWidget() is notes._list_page, "viewer Delete answered Yes removes the note and stays on the list")
+g = notes._store.create("Gamma", "<p>third</p>", "third")
+ids["Gamma"] = g.id
+notes._populate()
+NoteViewDialog.exec = real_view_exec
+
+# Back to notes / switching notes with unsaved edits asks first
+notes.edit_note(ids["Gamma"])
 notes._body.setPlainText("dirty edit")
 answer_exec(QMessageBox.StandardButton.Cancel)
-notes._list.setCurrentRow(2)
-check(notes.current_id() == cur_id and notes._list.currentRow() == 0, "selecting another note is blocked on Cancel and the selection snaps back")
+notes.back_to_list()
+check(notes._stack.currentWidget() is notes._editor and notes._dirty and notes.current_id() == ids["Gamma"],
+      "Back to notes is blocked on Cancel (edits kept)")
 answer_exec(QMessageBox.StandardButton.Save)
-notes._list.setCurrentRow(2)
-check(notes.current_id() != cur_id and not notes._dirty, "Save in the prompt saves, then switches")
+notes.back_to_list()
+check(notes._stack.currentWidget() is notes._list_page and not notes._dirty and notes.current_id() is None
+      and notes._store.get(ids["Gamma"]).body_text == "dirty edit", "Back to notes with Save saves, then shows the list")
+notes.edit_note(ids["Gamma"])
+notes._body.setPlainText("dirty again")
+answer_exec(QMessageBox.StandardButton.Discard)
+notes.back_to_list()
+check(notes._stack.currentWidget() is notes._list_page and not notes._dirty
+      and notes._store.get(ids["Gamma"]).body_text == "dirty edit", "Back to notes with Discard drops the edits and shows the list")
+notes.edit_note(ids["Gamma"])
+cur_id = notes.current_id()
+notes._body.setPlainText("dirty edit 2")
+answer_exec(QMessageBox.StandardButton.Cancel)
+notes.edit_note(n_id)
+check(notes.current_id() == cur_id and notes._dirty, "opening another note while dirty is blocked on Cancel")
+answer_exec(QMessageBox.StandardButton.Save)
+notes.edit_note(n_id)
+check(notes.current_id() == n_id and not notes._dirty and notes._store.get(cur_id).body_text == "dirty edit 2",
+      "opening another note while dirty: Save in the prompt saves, then switches")
 
 # Leaving the page / closing the window with unsaved edits
 notes._body.setPlainText("unsaved again")
 answer_exec(QMessageBox.StandardButton.Cancel)
 win.navigate("history")
 check(win.stack.currentWidget() is win.notes, "navigation away from dirty Notes is blocked on Cancel")
+check(notes.can_leave() is False and notes._stack.currentWidget() is notes._editor,
+      "can_leave is False on Cancel and stays on the editor")
 closed = win.close()
 check(closed is False and win.isVisible() and notes._dirty, "closing the window is blocked on Cancel (edits kept)")
 answer_exec(QMessageBox.StandardButton.Discard)
 win.navigate("history")
-check(win.stack.currentWidget() is win.history and not notes._dirty, "Discard lets navigation continue")
+check(win.stack.currentWidget() is win.history and not notes._dirty and notes._stack.currentWidget() is notes._list_page
+      and notes._store.get(n_id).body_text == "hello brave world", "Discard lets navigation continue and Notes returns to the list")
+win.navigate("notes")
+check(notes._stack.currentWidget() is notes._list_page, "coming back to Notes lands on the list")
+notes.edit_note(n_id)
+notes._body.setPlainText("saved by leaving")
+answer_exec(QMessageBox.StandardButton.Save)
+win.navigate("history")
+check(win.stack.currentWidget() is win.history and notes._stack.currentWidget() is notes._list_page
+      and notes._store.get(n_id).body_text == "saved by leaving", "Save in the leave prompt saves, then navigation continues")
+notes._store.update(n_id, body_text="hello brave world")
 win.navigate("notes")
 
-# Delete (confirmation)
+# Delete from the editor (confirmation) returns to the list
+notes.edit_note(n_id)
 count_before = len(notes._store)
 answer_question(QMessageBox.StandardButton.No)
 notes.delete_note()
-check(len(notes._store) == count_before, "Delete answered No keeps the note")
+check(len(notes._store) == count_before and notes._stack.currentWidget() is notes._editor, "Delete answered No keeps the note")
 answer_question(QMessageBox.StandardButton.Yes)
 notes.delete_note()
-check(len(notes._store) == count_before - 1 and notes._list.count() == count_before - 1, "Delete answered Yes removes it")
-while len(notes._store):
-    notes.delete_note()
-check(len(notes._store) == 0 and notes._stack.currentWidget() is notes._empty, "deleting the last note shows the empty state")
+check(len(notes._store) == count_before - 1 and notes._list.count() == count_before - 1
+      and notes._stack.currentWidget() is notes._list_page and notes.current_id() is None,
+      "Delete answered Yes removes it and returns to the list")
+notes.new_note()
+notes._title.setText("throwaway draft")
+notes.delete_note()
+check(notes._stack.currentWidget() is notes._list_page and len(notes._store) == count_before - 1,
+      "Delete on an unsaved draft discards it and returns to the list")
+for n_ in list(notes._store.list()):
+    notes._delete_stored(n_.id)
+check(len(notes._store) == 0 and notes._stack.currentWidget() is notes._list_page
+      and notes._list_stack.currentWidget() is notes._empty and notes._empty_title.text() == "No notes yet",
+      "deleting the last note shows the empty state on the list page")
 QMessageBox.exec, QMessageBox.question = real_exec, real_question
 
 # Empty note refuses to save; pasted rich text is flattened to plain text
@@ -473,6 +741,8 @@ notes.new_note()
 answer_exec(QMessageBox.StandardButton.Ok)
 QMessageBox.information = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok)
 check(notes.save() is False and len(notes._store) == 0, "a completely empty note is not saved")
+notes._save_and_close()
+check(notes._stack.currentWidget() is notes._editor, "Save on an empty note stays on the editor")
 # typing format must not leak from the previous note: bold switched on earlier, new note types plain
 check(not notes._bold.isChecked() and int(notes._body.currentCharFormat().fontWeight()) < 600
       and not notes._body.currentCharFormat().fontItalic(), "a new note starts with plain typing (no carried-over bold/italic)")
@@ -497,7 +767,7 @@ clean = sanitize_html(hostile)
 check(set(_re2.findall(r"</?(\w+)", clean)) <= {"p", "b", "i", "u", "span", "br"} and "font" not in clean
       and "alert" not in clean and "img" not in clean, f"sanitiser keeps only p/b/i/u/span/br ({clean})")
 
-# --- review fixes: selection sync, real Discard, whitespace, sanitise on load ---------------------------------------
+# --- review fixes: real Discard, whitespace, sanitise on load ---------------------------------------------------------
 from PySide6.QtGui import QTextDocument  # noqa: E402
 from gui.notes_html import load_html, plain_text  # noqa: E402
 for sample in ("a    b", "  lead", "x\ty", "a\n\nb", "a\n", "", "line1\n\n  indented\n\tdeeper"):
@@ -508,35 +778,36 @@ for sample in ("a    b", "  lead", "x\ty", "a\n\nb", "a\n", "", "line1\n\n  inde
 
 n_a = notes._store.create("Note A", "<p>alpha</p>", "alpha")
 n_b = notes._store.create("Note B", "<p>bravo</p>", "bravo")
+notes._show_list()
 notes._populate()
-notes._select_in_list(n_a.id)
-notes._load(notes._store.get(n_a.id))
+notes.edit_note(n_a.id)
 notes._body.setPlainText("alpha EDITED")
 answer_exec(QMessageBox.StandardButton.Save)
-row_b = next(r for r in range(notes._list.count()) if notes._list.item(r).data(NOTE_ROLE).id == n_b.id)
-notes._list.setCurrentRow(row_b)
-shown_id = notes._list.currentItem().data(NOTE_ROLE).id
-check(notes.current_id() == n_b.id and shown_id == n_b.id and notes._title.text() == "Note B",
-      "Save in the prompt: list highlight and editor show the same (new) note")
+notes.edit_note(n_b.id)
+check(notes.current_id() == n_b.id and notes._title.text() == "Note B" and notes._stack.currentWidget() is notes._editor,
+      "Save in the prompt: the editor shows the newly opened note")
 check(notes._store.get(n_a.id).body_text == "alpha EDITED", "…and the saved edit of the old note was stored")
 
-# a real Discard: leaving the page reverts the editor, so coming back shows the stored text, not the discarded edit
+# a real Discard: leaving the page drops the edit, so the stored note is untouched and Notes comes back on the list
 notes._body.setPlainText("DISCARD ME")
 check(notes._dirty, "edit marks dirty")
 answer_exec(QMessageBox.StandardButton.Discard)
 win.navigate("history")
-check(win.stack.currentWidget() is win.history and not notes._dirty and notes._body.toPlainText() == "bravo",
-      f"Discard really reverts the editor ({notes._body.toPlainText()!r})")
+check(win.stack.currentWidget() is win.history and not notes._dirty and notes._stack.currentWidget() is notes._list_page
+      and notes._store.get(n_b.id).body_text == "bravo", "Discard really drops the edit (stored note unchanged, list shown)")
 win.navigate("notes")
-check(not notes._dirty and notes._body.toPlainText() == "bravo", "coming back to Notes shows the stored note, no stale guard")
-# discarding a blank draft while leaving shows a note again instead of a lingering blank editor
+check(not notes._dirty and notes._stack.currentWidget() is notes._list_page and notes.current_id() is None,
+      "coming back to Notes shows the list, no stale guard")
+# discarding a blank draft while leaving shows the list instead of a lingering blank editor
 notes.new_note()
 notes._title.setText("draft only")
 answer_exec(QMessageBox.StandardButton.Discard)
 win.navigate("history")
 win.navigate("notes")
-check(notes.current_id() is not None and notes._title.text() != "draft only", "a discarded draft is gone; a stored note is shown")
+check(notes.current_id() is None and notes._stack.currentWidget() is notes._list_page and notes._title.text() != "draft only"
+      and len(notes._store) == 2, "a discarded draft is gone and the list is shown")
 # 'New note' after a Discard must stay blank (no deferred re-selection)
+notes.edit_note(n_b.id)
 answer_exec(QMessageBox.StandardButton.Discard)
 notes._body.setPlainText("dirty")
 notes.new_note()
@@ -545,17 +816,19 @@ check(notes.current_id() is None and notes._title.text() == "" and not notes._di
 QMessageBox.exec = real_exec
 
 # sanitise on load: a hand-edited note body cannot bring fonts / images / links into the editor
-evil = notes._store.create("Evil", '<p style="font-size:44pt;font-family:Comic Sans MS"><img src="C:/x.png"><a href="http://evil">z</a>ok</p>', "ok")
+evil = notes._store.create(
+    "Evil", '<p style="font-size:44pt;font-family:Comic Sans MS"><img src="C:/x.png"><a href="http://evil">z</a>ok</p>', "ok")
 notes._populate()
-notes._select_in_list(evil.id)
-notes._load(notes._store.get(evil.id))
+notes.edit_note(evil.id)
 loaded = document_to_html(notes._body.document())
 check("img" not in loaded and "font" not in loaded and "href" not in loaded and "ok" in notes._body.toPlainText(),
       f"stored HTML is re-sanitised when a note is opened ({loaded})")
 for n_ in list(notes._store.list()):
     notes._store.delete(n_.id)
 notes._populate()
-notes._select_first_or_empty()
+notes._show_list()
+check(notes._stack.currentWidget() is notes._list_page and notes._list_stack.currentWidget() is notes._empty,
+      "emptied store shows the empty list state")
 
 # Corrupt notes file shows a banner instead of silently losing data
 bad_dir = Path(tempfile.mkdtemp(prefix="asx_badnotes_"))
