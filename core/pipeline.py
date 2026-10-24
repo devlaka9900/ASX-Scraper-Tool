@@ -31,6 +31,7 @@ class RunRequest:
     cutoff: datetime
     output_root: Path
     overwrite_downloads: bool = False
+    startpoint: str = ""                 # optional label; display-only (kept in the run summary)
 
 
 def run_pipeline(
@@ -44,6 +45,7 @@ def run_pipeline(
     meta = RunMeta(
         run_id=started.strftime("%Y%m%d_%H%M%S"),
         project_id=req.project_id,
+        startpoint=req.startpoint.strip(),
         url=req.url,
         cutoff=req.cutoff.strftime("%Y-%m-%d"),
         started_at=started.isoformat(timespec="seconds"),

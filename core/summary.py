@@ -34,7 +34,8 @@ class SummaryError(Exception):
 @dataclass
 class RunMeta:
     run_id: str = ""
-    project_id: str = ""
+    project_id: str = ""                 # shown to users as "DocumentId"
+    startpoint: str = ""                 # optional free-text label shown next to the DocumentId
     url: str = ""
     cutoff: str = ""                     # YYYY-MM-DD
     started_at: str = ""

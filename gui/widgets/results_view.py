@@ -111,12 +111,16 @@ class ResultsView(QWidget):
     def _build_header(self) -> None:
         box = QVBoxLayout()
         box.setSpacing(4)
+        box.addWidget(label("DocumentId", "caption"))
         top = QHBoxLayout()
         top.setSpacing(12)
         self._title = label("", "h1")
         self._tag = label("", "caption")
         self._tag.setVisible(False)
+        self._startpoint = label("", "pill")          # optional Startpoint, next to the DocumentId
+        self._startpoint.setVisible(False)
         top.addWidget(self._title)
+        top.addWidget(self._startpoint, 0, Qt.AlignmentFlag.AlignVCenter)
         top.addWidget(self._tag, 0, Qt.AlignmentFlag.AlignBottom)
         top.addStretch(1)
         self._header_extra = QHBoxLayout()
@@ -271,6 +275,7 @@ class ResultsView(QWidget):
         self._proxy.setSourceModel(self._model)
 
         self._table = QTableView()
+        self._table.setProperty("dataTable", True)
         self._table.setModel(self._proxy)
         self._table.setItemDelegateForColumn(COL_STATUS, BadgeDelegate(self._table))
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -331,6 +336,11 @@ class ResultsView(QWidget):
         self._search.blockSignals(False)
 
         self._title.setText(meta.project_id or "Results")
+        shown = self._startpoint.fontMetrics().elidedText(
+            f"Startpoint · {meta.startpoint}", Qt.TextElideMode.ElideRight, 340) if meta.startpoint else ""
+        self._startpoint.setText(shown)
+        self._startpoint.setToolTip(meta.startpoint)
+        self._startpoint.setVisible(bool(meta.startpoint))
         is_check = result.kind == "date_check"
         self._tag.setVisible(is_check)
         self._tag.setText("DATE CHECK" if is_check else "")
@@ -374,7 +384,32 @@ class ResultsView(QWidget):
         self._apply()
 
     def clear(self) -> None:
+        """Drop the shown result and reset every part of the dashboard."""
         self._result = None
+        self._cats, self._section = set(), None
+        self._search.blockSignals(True)
+        self._search.clear()
+        self._search.blockSignals(False)
+        self._model.set_entries([])
+        self._proxy.set_filters("", set(), None)
+        self._syncing = True
+        self._section_combo.clear()
+        self._syncing = False
+        for card_ in self._kpis.values():
+            card_.set_value(0, "", animate=False)
+            card_.set_active(False)
+        self._donut.set_data([], animate=False)
+        self._bars.set_data([], animate=False)
+        self._banner.setVisible(False)
+        self._title.setText("")
+        self._startpoint.setVisible(False)
+        self._meta.setText("")
+        self._url.set_full_text("")
+        self._count.setText("")
+        self._stack.setCurrentIndex(0)
+
+    def search_box(self) -> QLineEdit:
+        return self._search
 
     def scroll_to_bottom(self) -> None:
         bar = self._scroll.verticalScrollBar()

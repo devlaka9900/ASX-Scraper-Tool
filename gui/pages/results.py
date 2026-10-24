@@ -8,6 +8,7 @@ from core.summary import RunResult
 from gui import icons, theme
 from gui.widgets.common import IconButton, label
 from gui.widgets.results_view import ResultsView
+from gui.widgets.watermark import WatermarkWidget
 
 
 class ResultsPage(QWidget):
@@ -21,7 +22,7 @@ class ResultsPage(QWidget):
         self._stack = QStackedWidget()
         lay.addWidget(self._stack)
 
-        empty = QWidget()
+        empty = WatermarkWidget()
         el = QVBoxLayout(empty)
         el.addStretch(2)
         self._empty_icon = QLabel()

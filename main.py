@@ -93,9 +93,9 @@ def main() -> None:
 # --------------------------------------------------------------------------- #
 
 def _prompt_inputs() -> tuple[str, str, datetime]:
-    project_id = Prompt.ask("[bold]Project ID[/bold]").strip()
+    project_id = Prompt.ask("[bold]DocumentId[/bold]").strip()
     if not project_id:
-        console.print("[red]Project ID cannot be empty.[/red]")
+        console.print("[red]DocumentId cannot be empty.[/red]")
         sys.exit(1)
 
     url = Prompt.ask("[bold]Page URL[/bold]").strip()
@@ -112,9 +112,9 @@ def _prompt_inputs() -> tuple[str, str, datetime]:
             console.print("[red]Invalid date. Use YYYY-MM-DD format (e.g. 2024-01-01).[/red]")
 
     console.print()
-    console.print(f"  Project  : [bold]{project_id}[/bold]")
-    console.print(f"  URL      : {url}")
-    console.print(f"  Cutoff   : [bold]{cutoff.strftime('%Y-%m-%d')}[/bold]")
+    console.print(f"  DocumentId : [bold]{project_id}[/bold]")
+    console.print(f"  URL        : {url}")
+    console.print(f"  Cutoff     : [bold]{cutoff.strftime('%Y-%m-%d')}[/bold]")
     console.print()
 
     return project_id, url, cutoff

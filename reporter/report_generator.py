@@ -59,7 +59,7 @@ def _write_analysis_report(
         "",
         "| Field | Value |",
         "|-------|-------|",
-        f"| Project ID | `{project_id}` |",
+        f"| DocumentId | `{project_id}` |",
         f"| Source URL | {url} |",
         f"| Cutoff Date | **{cutoff.strftime('%Y-%m-%d')}** |",
         f"| Run At | {now} |",

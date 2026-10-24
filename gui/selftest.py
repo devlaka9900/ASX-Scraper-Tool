@@ -119,9 +119,18 @@ def run(out_dir: Path | None = None) -> int:
             app.setStyle("Fusion")
             settings = Settings(QSettings(str(out / "selftest.ini"), QSettings.Format.IniFormat))
             shots = []
+            from core.notes import NotesStore
+            seeded = NotesStore(out / "selftest_notes.json")
+            for title, html, text in (
+                ("Release checklist", '<p><b>Before shipping</b></p><p>Run the <i>self-test</i>, then check the '
+                 '<span style="color:#e5484d">crash log</span>.</p>', "Before shipping\nRun the self-test, then check the crash log."),
+                ("Cutoff rules", "<p>Use the latest <u>Waivers</u> document when the cutoff is unknown.</p>",
+                 "Use the latest Waivers document when the cutoff is unknown."),
+            ):
+                seeded.create(title, html, text)
             for mode in ("dark", "light"):
                 theme.apply(app, mode)
-                win = MainWindow(settings)
+                win = MainWindow(settings, notes_path=out / "selftest_notes.json")
                 w, h = (int(v) for v in os.environ.get("ASX_SELFTEST_SIZE", "1280x820").split("x"))
                 win.resize(w, h)
                 win.show()
@@ -132,6 +141,7 @@ def run(out_dir: Path | None = None) -> int:
                 pages = {
                     "new_run": win.new_run, "run": win.run_view, "results": win.results,
                     "history": win.history, "date_checker": win.date_checker,
+                    "notes": win.notes, "agent": win.agent,
                 }
                 for name, page in pages.items():
                     win.stack.setCurrentWidget(page)
@@ -150,10 +160,29 @@ def run(out_dir: Path | None = None) -> int:
                 win.close()
             return f"{len(shots)} screenshots in {out}"
 
+        def notes_roundtrip():
+            import re
+            from PySide6.QtWidgets import QApplication
+            from core.notes import NotesStore
+            from gui.notes_html import sanitize_html
+            _app = QApplication.instance() or QApplication([sys.argv[0]])
+            store = NotesStore(out / "roundtrip_notes.json")
+            n = store.create("Heading", "<p><b>x</b></p>", "x")
+            store.update(n.id, body_html="<p>y</p>", body_text="y")
+            if NotesStore(out / "roundtrip_notes.json").get(n.id).body_text != "y":
+                raise RuntimeError("notes did not persist")
+            if len(store.search("heading")) != 1 or not store.delete(n.id) or len(store):
+                raise RuntimeError("notes search/delete failed")
+            clean = sanitize_html('<script>x</script><p style="font-size:30pt">a <b>b</b><img src="c:/x.png"></p>')
+            tags = set(re.findall(r"</?(\w+)", clean))
+            if not tags <= {"p", "b", "i", "u", "span", "br"} or "font-size" in clean:
+                raise RuntimeError(f"sanitizer let something through: {clean}")
+
         for name, fn in (("imports", imports), ("pdf round trip", pdf_roundtrip),
                          ("scraper parse (bs4 + lxml + dateutil)", scrape_parse),
                          ("live network scrape", live_network),
                          ("reports + summary round trip", reports_roundtrip),
+                         ("notes store + sanitizer", notes_roundtrip),
                          ("render pages (both themes)", render_pages)):
             step(name, fn)
     except Exception:

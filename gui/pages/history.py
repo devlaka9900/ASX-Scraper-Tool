@@ -14,9 +14,10 @@ from core.summary import CATEGORIES, HistoryItem, scan_history
 from gui import fileops, icons, theme
 from gui.settings import Settings
 from gui.widgets.common import IconButton, card, label
+from gui.widgets.watermark import WatermarkWidget
 
-COLS = ("Run", "Project", "Cutoff", "Result", "PDFs", "Duration", "Status")
-C_RUN, C_PROJECT, C_CUTOFF, C_RESULT, C_PDFS, C_DUR, C_STATUS = range(7)
+COLS = ("Run", "DocumentId", "Startpoint", "Cutoff", "Result", "PDFs", "Duration", "Status")
+C_RUN, C_PROJECT, C_START, C_CUTOFF, C_RESULT, C_PDFS, C_DUR, C_STATUS = range(8)
 ITEM_ROLE = Qt.ItemDataRole.UserRole
 _STATUS_LABEL = {"completed": "Completed", "cancelled": "Cancelled", "failed": "Failed"}
 
@@ -91,11 +92,14 @@ class HistoryPage(QWidget):
         hl = QVBoxLayout(holder)
         hl.setContentsMargins(0, 0, 0, 0)
         self._table = QTableWidget(0, len(COLS))
+        self._table.setProperty("dataTable", True)
         self._table.setHorizontalHeaderLabels(COLS)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setShowGrid(False)
+        self._table.setWordWrap(False)                    # long ids/startpoints elide instead of wrapping
+        self._table.setTextElideMode(Qt.TextElideMode.ElideRight)
         self._table.verticalHeader().setVisible(False)
         self._table.verticalHeader().setDefaultSectionSize(44)
         self._table.setAccessibleName("Run history")
@@ -104,7 +108,9 @@ class HistoryPage(QWidget):
         header.setHighlightSections(False)
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         header.setSectionResizeMode(C_PROJECT, QHeaderView.ResizeMode.Stretch)
-        for col, width in ((C_RUN, 150), (C_CUTOFF, 110), (C_RESULT, 210), (C_PDFS, 70), (C_DUR, 100), (C_STATUS, 120)):
+        # at the 1100px minimum the DocumentId (stretch column) must still get ~150px
+        for col, width in ((C_RUN, 122), (C_START, 128), (C_CUTOFF, 88), (C_RESULT, 100), (C_PDFS, 52),
+                           (C_DUR, 76), (C_STATUS, 94)):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
             header.resizeSection(col, width)
         self._table.itemSelectionChanged.connect(self._update_buttons)
@@ -112,7 +118,7 @@ class HistoryPage(QWidget):
         self._table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._table.customContextMenuRequested.connect(self._menu)
 
-        self._empty = QWidget()
+        self._empty = WatermarkWidget()
         el = QVBoxLayout(self._empty)
         el.addStretch(1)
         t = label("No runs yet", "h2")
@@ -141,7 +147,8 @@ class HistoryPage(QWidget):
             m, s = item.meta, item.stats
             when = _fmt(m.started_at)
             cells = {
-                C_RUN: when, C_PROJECT: m.project_id, C_CUTOFF: m.cutoff, C_RESULT: "",
+                C_RUN: when, C_PROJECT: m.project_id, C_START: m.startpoint or "—",
+                C_CUTOFF: m.cutoff, C_RESULT: "",
                 C_PDFS: f"{s.get('total', 0):,}",
                 C_DUR: f"{m.duration_s:.0f} s" if m.duration_s else "—",
                 C_STATUS: _STATUS_LABEL.get(m.status, m.status) + ("" if item.base_exists else " (files missing)"),
@@ -149,6 +156,8 @@ class HistoryPage(QWidget):
             for col, text in cells.items():
                 cell = QTableWidgetItem(text)
                 cell.setData(ITEM_ROLE, item)
+                if col in (C_PROJECT, C_START) and text and text != "—":
+                    cell.setToolTip(text)             # full text when the column is narrow
                 if col == C_PDFS:
                     cell.setTextAlignment(int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
                 if col == C_RESULT:

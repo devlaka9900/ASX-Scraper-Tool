@@ -4,12 +4,12 @@ GUI port of check_pdf_dates.py — no scraping, no downloads, nothing is copied.
 """
 from __future__ import annotations
 
-from datetime import date, datetime
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QTimer, Qt, Signal
+from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QComboBox, QDateEdit, QFileDialog, QHBoxLayout, QLineEdit, QProgressBar, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QComboBox, QFileDialog, QHBoxLayout, QLineEdit, QProgressBar, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from core import datecheck
@@ -17,7 +17,9 @@ from core.summary import RunResult, scan_history
 from gui import theme
 from gui.settings import Settings
 from gui.widgets.common import IconButton, card, label, primary
+from gui.widgets.date_input import DateInput
 from gui.widgets.results_view import ResultsView
+from gui.widgets.watermark import WatermarkWidget
 
 
 class DateCheckerPage(QWidget):
@@ -27,6 +29,7 @@ class DateCheckerPage(QWidget):
         super().__init__(parent)
         self._settings = settings
         self._busy = False
+        self._folder_err: str | None = None
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 28, 0, 0)
@@ -69,13 +72,11 @@ class DateCheckerPage(QWidget):
         row2 = QHBoxLayout()
         row2.setSpacing(10)
         row2.addWidget(label("New cutoff", "h3"))
-        self._cutoff = QDateEdit()
-        self._cutoff.setCalendarPopup(True)
-        self._cutoff.setDisplayFormat("yyyy-MM-dd")
-        self._cutoff.setAccessibleName("New cutoff date")
-        today = date.today()
-        self._cutoff.setDate(QDate(today.year, today.month, today.day))
-        self._cutoff.setMinimumWidth(160)
+        self._cutoff = DateInput()
+        self._cutoff.set_accessible_name("New cutoff date")
+        self._cutoff.setMaximumWidth(260)
+        self._cutoff.changed.connect(self._refresh_go)
+        self._cutoff.returnPressed.connect(self._submit)
         row2.addWidget(self._cutoff)
         row2.addStretch(1)
         self._error = label("", "error")
@@ -95,10 +96,10 @@ class DateCheckerPage(QWidget):
         lay.addLayout(head)
 
         self._stack = QStackedWidget()
-        placeholder = QWidget()
+        placeholder = WatermarkWidget()
         pl = QVBoxLayout(placeholder)
         pl.addStretch(1)
-        hint = label("Pick a folder and a cutoff, then press Check dates.", "muted")
+        hint = label("Pick a folder and enter a cutoff date, then press Check dates.", "muted")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         pl.addWidget(hint)
         pl.addStretch(2)
@@ -107,6 +108,15 @@ class DateCheckerPage(QWidget):
         self._export_btn.setToolTip("Write markdown + Excel reports into <project>/date_checks/<cutoff>_<time>/")
         self._export_btn.clicked.connect(self._export)
         self.view.add_action(self._export_btn)
+        self._close_btn = IconButton("Close results", "x")
+        self._close_btn.setToolTip("Close this result and go back to the form (Esc)")
+        self._close_btn.setAccessibleName("Close results")
+        self._close_btn.clicked.connect(self.close_results)
+        self.view.add_header_widget(self._close_btn)
+        # window-wide so Esc works wherever focus is on this page; _on_escape checks visibility
+        QShortcut(QKeySequence("Esc"), self, activated=self._on_escape,
+                  context=Qt.ShortcutContext.WindowShortcut)
+        self._placeholder = placeholder
         self._stack.addWidget(placeholder)
         self._stack.addWidget(self.view)
         lay.addSpacing(8)
@@ -125,7 +135,8 @@ class DateCheckerPage(QWidget):
             if item.base_dir in seen or not item.base_exists:
                 continue
             seen.add(item.base_dir)
-            self._runs.addItem(f"{item.meta.project_id}  ·  cutoff {item.meta.cutoff}", str(item.base_dir))
+            start = f"  ·  {item.meta.startpoint}" if item.meta.startpoint else ""
+            self._runs.addItem(f"{item.meta.project_id}{start}  ·  cutoff {item.meta.cutoff}", str(item.base_dir))
         self._runs.blockSignals(False)
 
     def set_source(self, folder: Path) -> None:
@@ -155,18 +166,47 @@ class DateCheckerPage(QWidget):
         return None
 
     def _update_state(self) -> None:
-        err = self._folder_error()
-        self._error.setText(err or "")
-        self._error.setVisible(bool(err))
-        self._go.setEnabled(bool(self._path.text().strip()) and err is None and not self._busy)
+        """Re-check the folder (scans for PDFs, so it is debounced) and refresh the button."""
+        self._folder_err = self._folder_error()
+        self._error.setText(self._folder_err or "")
+        self._error.setVisible(bool(self._folder_err))
+        self._refresh_go()
+
+    def _refresh_go(self) -> None:
+        """Cheap: runs on every keystroke in the date field, uses the cached folder check."""
+        has_folder = bool(self._path.text().strip()) and self._folder_err is None
+        date_err = self._cutoff.error()
+        self._go.setEnabled(has_folder and date_err is None and not self._busy)
+        if self._busy:
+            self._go.setToolTip("")
+        elif not has_folder:
+            self._go.setToolTip("Choose a folder that contains downloaded PDFs")
+        else:
+            self._go.setToolTip(date_err or "")
 
     def _submit(self) -> None:
         self._debounce.stop()
         self._update_state()
         if not self._go.isEnabled():
             return
-        qd = self._cutoff.date()
-        self.checkRequested.emit(Path(self._path.text().strip()), datetime(qd.year(), qd.month(), qd.day()))
+        cutoff = self._cutoff.date()              # validated by _refresh_go, never None here
+        self.checkRequested.emit(Path(self._path.text().strip()), cutoff)
+
+    def close_results(self) -> None:
+        """Dismiss the opened result and go back to the form."""
+        if self._busy:
+            return
+        self.view.clear()
+        self._stack.setCurrentWidget(self._placeholder)
+
+    def _on_escape(self) -> None:
+        if not (self.isVisible() and self._stack.currentWidget() is self.view):
+            return
+        search = self.view.search_box()
+        if QApplication.focusWidget() is search and search.text():
+            search.clear()                     # first Esc clears the search, it does not discard the result
+            return
+        self.close_results()
 
     # ---- state driven by MainWindow --------------------------------------------- #
 

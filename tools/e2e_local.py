@@ -264,6 +264,111 @@ for i in range(50):
     w._on_progress("download", i + 1, 500, "✗ fail%d" % i)      # burst, far inside one 50 ms window
 check(len(seen) == 50, f"all failed-file messages are forwarded ({len(seen)}/50)")
 
+# ---- 9. v1.2.0: Startpoint round trip ---------------------------------------------------------------
+sp_req = RunRequest("e2e-sp", f"{BASE}/page", cutoff, out_root, startpoint="  Chapter   5  ")
+sp = run_pipeline(sp_req)
+# the pipeline only trims; whitespace collapsing is the GUI's job (validation.clean_startpoint)
+check(sp.meta.status == "completed" and sp.meta.startpoint == "Chapter   5",
+      f"startpoint kept on the run meta ({sp.meta.startpoint!r})")
+loaded_sp = load_run(out_root / "e2e-sp" / "run_summary.json")
+check(loaded_sp.meta.startpoint == sp.meta.startpoint, "startpoint survives run_summary.json")
+hits = [h for h in scan_history([out_root]) if h.meta.project_id == "e2e-sp"]
+check(hits and hits[0].meta.startpoint == sp.meta.startpoint, "startpoint is listed by scan_history")
+chk_sp = datecheck.check_folder(out_root / "e2e-sp", datetime(2020, 1, 1))
+check(chk_sp.meta.startpoint == sp.meta.startpoint, "date check carries the startpoint over from the source run")
+check(run_pipeline(RunRequest("e2e-nosp", f"{BASE}/page", cutoff, out_root)).meta.startpoint == "", "no startpoint -> empty string")
+old = json.loads((out_root / "e2e-sp" / "run_summary.json").read_text(encoding="utf-8"))
+old["meta"].pop("startpoint")
+(out_root / "e2e-sp" / "run_summary.json").write_text(json.dumps(old), encoding="utf-8")
+check(load_run(out_root / "e2e-sp" / "run_summary.json").meta.startpoint == "", "a v1.0/1.1 summary without startpoint still loads")
+
+# ---- 10. v1.2.0: Notes store ----------------------------------------------------------------------------
+from core.notes import BODY_MAX, NotesError, NotesStore, TITLE_MAX  # noqa: E402
+
+npath = WORK / "notes_test" / "notes.json"
+store = NotesStore(npath)
+check(len(store) == 0 and not npath.exists(), "new store is empty and creates no file until the first save")
+n1 = store.create("Alpha heading", "<p><b>hello</b> world</p>", "hello world")
+time.sleep(1.05)
+n2 = store.create("Beta", "<p>second note</p>", "second note")
+check(npath.exists() and [n.id for n in store.list()] == [n2.id, n1.id], "create persists; list is newest-updated first")
+check(NotesStore(npath).get(n1.id).body_html == "<p><b>hello</b> world</p>", "notes survive reopening the store")
+time.sleep(1.05)
+store.update(n1.id, title="Alpha renamed", body_text="hello brave world", body_html="<p>hello brave world</p>")
+check(store.list()[0].id == n1.id and store.get(n1.id).title == "Alpha renamed", "update changes content and bumps it to the top")
+check([n.id for n in store.search("brave")] == [n1.id] and [n.id for n in store.search("SECOND")] == [n2.id]
+      and store.search("zzz") == [] and len(store.search("  ")) == 2, "search (body + title, case-insensitive, empty = all)")
+check(store.get(n1.id).created_at <= store.get(n1.id).updated_at, "timestamps are ordered")
+check((npath.with_name("notes.json.bak")).exists(), "previous version kept as notes.json.bak")
+check(not list(npath.parent.glob("*.tmp")), "no temp files left behind")
+check(store.create("", "", "").title == "Untitled note", "empty heading becomes 'Untitled note'")
+for bad, msg in (({"title": "x" * (TITLE_MAX + 1)}, "long title"), ({"body_text": "x" * (BODY_MAX + 1)}, "long body")):
+    try:
+        store.create(**bad)
+        check(False, f"{msg} is rejected")
+    except NotesError:
+        check(True, f"{msg} is rejected")
+check(store.delete(n2.id) is True and store.delete(n2.id) is False and store.get(n2.id) is None, "delete (and deleting twice)")
+try:
+    store.update("nope", title="x")
+    check(False, "updating a missing note raises")
+except NotesError:
+    check(True, "updating a missing note raises")
+
+# a corrupt file is set aside, never overwritten
+cpath = WORK / "notes_corrupt" / "notes.json"
+cpath.parent.mkdir()
+cpath.write_text("{ this is not json", encoding="utf-8")
+cstore = NotesStore(cpath)
+aside = list(cpath.parent.glob("notes.corrupt-*.json"))
+check(len(cstore) == 0 and cstore.recovered_from is not None and len(aside) == 1
+      and aside[0].read_text(encoding="utf-8") == "{ this is not json", "corrupt notes file is kept aside, store starts empty")
+cstore.create("fresh", "", "")
+check(json.loads(cpath.read_text(encoding="utf-8"))["notes"][0]["title"] == "fresh", "…and the new store saves normally")
+# damaged entries are skipped, good ones kept; a newer schema is refused
+mpath = WORK / "notes_mixed" / "notes.json"
+mpath.parent.mkdir()
+mpath.write_text(json.dumps({"schema_version": 1, "notes": [{"id": "a", "title": "ok"}, {"title": "no id"}, 5]}), encoding="utf-8")
+mstore = NotesStore(mpath)
+check(len(mstore) == 1 and mstore.skipped == 2, f"damaged note entries are skipped ({len(mstore)} kept, {mstore.skipped} skipped)")
+fpath = WORK / "notes_future" / "notes.json"
+fpath.parent.mkdir()
+fpath.write_text(json.dumps({"schema_version": 99, "notes": []}), encoding="utf-8")
+try:
+    NotesStore(fpath)
+    check(False, "a newer notes schema is refused")
+except NotesError:
+    check(fpath.read_text(encoding="utf-8").startswith('{"schema_version": 99'), "a newer notes schema is refused and left untouched")
+
+# ---- 11. Notes: writes are all-or-nothing, damaged entries are preserved --------------------------------------
+import core.notes as _notes_mod  # noqa: E402
+
+tpath = WORK / "notes_txn" / "notes.json"
+ts = NotesStore(tpath)
+keep = ts.create("keep me", "<p>k</p>", "k")
+real_replace = _notes_mod.os.replace
+def failing_replace(*a, **k):
+    raise PermissionError("simulated: file is locked")
+_notes_mod.os.replace = failing_replace
+try:
+    for what, call in (("create", lambda: ts.create("lost", "<p>x</p>", "x")),
+                       ("update", lambda: ts.update(keep.id, title="changed", body_text="changed")),
+                       ("delete", lambda: ts.delete(keep.id))):
+        try:
+            call()
+            check(False, f"failed {what} raises")
+        except PermissionError:
+            check(True, f"failed {what} raises")
+finally:
+    _notes_mod.os.replace = real_replace
+check(len(ts) == 1 and ts.get(keep.id).title == "keep me" and ts.get(keep.id).body_text == "k",
+      "after failed writes the in-memory notes still match the file (nothing lost, nothing half-applied)")
+ts.create("second", "", "")
+check(sorted(n.title for n in NotesStore(tpath).list()) == ["keep me", "second"],
+      "a later successful save neither resurrects a failed create nor drops a failed delete")
+check(mstore.kept_damaged is not None and "no id" in mstore.kept_damaged.read_text(encoding="utf-8"),
+      "a copy of the original is kept when damaged entries were skipped")
+
 print()
 print("work dir:", WORK)
 print("ALL PASS" if not fails else f"{len(fails)} FAILED")

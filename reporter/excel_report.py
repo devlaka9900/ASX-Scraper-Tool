@@ -253,7 +253,7 @@ def _write_summary_panel(
     _banner(ws, row, col, "Summary")
     row += 1
     for key, value in [
-        ("Project ID", project_id),
+        ("DocumentId", project_id),
         ("Source URL", url),
         ("Cutoff Date", cutoff.strftime("%Y-%m-%d")),
         ("Run At", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),

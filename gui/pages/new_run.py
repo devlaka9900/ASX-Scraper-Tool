@@ -1,24 +1,26 @@
-"""New Run: the three inputs (Project ID, Page URL, Cutoff date) + output folder."""
+"""New Run: DocumentId (+ optional Startpoint), Page URL, Cutoff date, output folder."""
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QDate, Qt, Signal
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QDateEdit, QFileDialog, QHBoxLayout, QLineEdit, QScrollArea, QVBoxLayout, QWidget,
+    QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from core.pipeline import RunRequest
-from gui import validation
+from gui import icons, theme, validation
 from gui.settings import Settings
 from gui.widgets.common import IconButton, card, label, primary, repolish
+from gui.widgets.date_input import DateInput
 
 MAX_WIDTH = 760
 
-
-def _qdate(d: date) -> QDate:
-    return QDate(d.year, d.month, d.day)
+DEV_NOTE = (
+    "If the cutoff date is unavailable or difficult to determine, derive it from the Waivers section: "
+    "use the date of the most recent document in that section, which reflects the latest version "
+    "delivered by CUBE."
+)
 
 
 class NewRunPage(QWidget):
@@ -59,14 +61,29 @@ class NewRunPage(QWidget):
         fl.setContentsMargins(24, 22, 24, 22)
         fl.setSpacing(6)
 
-        # Project ID
-        fl.addWidget(label("Project ID", "h3"))
+        # DocumentId (stored internally as project_id)
+        fl.addWidget(label("DocumentId", "h3"))
         self._project = QLineEdit(settings.last_project_id)
         self._project.setPlaceholderText("e.g. AU--ASELA--REG--ASX-0")
-        self._project.setAccessibleName("Project ID")
+        self._project.setAccessibleName("DocumentId")
         self._project_err = label("", "error")
         fl.addWidget(self._project)
         fl.addWidget(self._project_err)
+        fl.addSpacing(8)
+
+        # Startpoint — optional free text, shown next to the DocumentId on the app screens
+        head = QHBoxLayout()
+        head.setSpacing(8)
+        head.addWidget(label("Startpoint", "h3"))
+        head.addWidget(label("optional", "caption"))
+        head.addStretch(1)
+        fl.addLayout(head)
+        self._startpoint = QLineEdit()
+        self._startpoint.setMaxLength(validation.STARTPOINT_MAX)
+        self._startpoint.setPlaceholderText("Optional — e.g. a starting chapter, document or reference")
+        self._startpoint.setAccessibleName("Startpoint (optional)")
+        self._startpoint.setClearButtonEnabled(True)
+        fl.addWidget(self._startpoint)
         fl.addSpacing(8)
 
         # URL
@@ -83,33 +100,16 @@ class NewRunPage(QWidget):
         fl.addWidget(label("Cutoff date", "h3"))
         row = QHBoxLayout()
         row.setSpacing(10)
-        self._cutoff = QDateEdit()
-        self._cutoff.setCalendarPopup(True)
-        self._cutoff.setDisplayFormat("yyyy-MM-dd")
-        self._cutoff.setAccessibleName("Cutoff date")
-        self._cutoff.setMinimumWidth(160)
-        last = settings.last_cutoff
-        try:
-            start = datetime.strptime(last, "%Y-%m-%d").date() if last else date.today()
-        except ValueError:
-            start = date.today()
-        self._cutoff.setDate(_qdate(start))
+        self._cutoff = DateInput()
+        self._cutoff.set_accessible_name("Cutoff date")
+        self._cutoff.setMaximumWidth(260)
         row.addWidget(self._cutoff)
-        for text, tip, fn in (
-            ("Today", "Set cutoff to today", lambda: date.today()),
-            ("30 days ago", "Set cutoff to 30 days ago", lambda: date.today() - timedelta(days=30)),
-            ("90 days ago", "Set cutoff to 90 days ago", lambda: date.today() - timedelta(days=90)),
-            ("Start of year", "Set cutoff to 1 January this year", lambda: date(date.today().year, 1, 1)),
-            ("1 year ago", "Set cutoff to one year ago", lambda: date.today() - timedelta(days=365)),
-        ):
-            chip = IconButton(text, None)
-            chip.setProperty("chip", True)
-            chip.setToolTip(tip)
-            chip.clicked.connect(lambda _=False, f=fn: self._cutoff.setDate(_qdate(f())))
-            row.addWidget(chip)
         row.addStretch(1)
         fl.addLayout(row)
-        fl.addWidget(label("A PDF counts as Updated when its date is after 00:00 on the cutoff day.", "hint"))
+        self._cutoff_err = label("", "error")
+        fl.addWidget(self._cutoff_err)
+        fl.addWidget(label("Type the date as YYYY-MM-DD or use the calendar. A PDF counts as Updated when "
+                           "its date is after 00:00 on the cutoff day.", "hint", wrap=True))
         fl.addSpacing(8)
 
         # Output folder
@@ -134,6 +134,24 @@ class NewRunPage(QWidget):
         fl.addWidget(self._redownload)
         lay.addWidget(form)
 
+        # developer note
+        note = card("flat")
+        nl = QHBoxLayout(note)
+        nl.setContentsMargins(16, 12, 16, 12)
+        nl.setSpacing(12)
+        self._note_icon = QLabel()
+        self._note_icon.setFixedSize(20, 20)
+        nl.addWidget(self._note_icon, 0, Qt.AlignmentFlag.AlignTop)
+        nbox = QVBoxLayout()
+        nbox.setSpacing(2)
+        nbox.addWidget(label("Developer note", "h3"))
+        note_text = label(DEV_NOTE, "secondary", wrap=True)
+        note_text.setAccessibleName("Developer note")
+        nbox.addWidget(note_text)
+        nl.addLayout(nbox, 1)
+        theme.bus.changed.connect(self._refresh_note_icon)
+        self._refresh_note_icon()
+
         foot = QHBoxLayout()
         foot.addStretch(1)
         self._start = primary("Start run", "play")
@@ -142,16 +160,23 @@ class NewRunPage(QWidget):
         self._start.setAccessibleName("Start run")
         self._start.clicked.connect(self._submit)
         foot.addWidget(self._start)
-        lay.addLayout(foot)
+        lay.addLayout(foot)           # Start stays above the fold at the minimum window size …
+        lay.addWidget(note)           # … the developer note sits below it
         lay.addStretch(1)
 
         for key, edit in (("id", self._project), ("url", self._url), ("out", self._output)):
             edit.textChanged.connect(lambda _t, k=key: self._on_edit(k))
             edit.editingFinished.connect(lambda k=key: self._on_blur(k))
             edit.returnPressed.connect(self._submit)
-        self.setTabOrder(self._project, self._url)
-        self.setTabOrder(self._url, self._cutoff)
-        self.setTabOrder(self._cutoff, self._output)
+        self._startpoint.returnPressed.connect(self._submit)
+        self._cutoff.changed.connect(lambda: self._on_edit("date"))
+        self._cutoff.blurred.connect(lambda: self._on_blur("date"))
+        self._cutoff.returnPressed.connect(self._submit)
+        self.setTabOrder(self._project, self._startpoint)
+        self.setTabOrder(self._startpoint, self._url)
+        self.setTabOrder(self._url, self._cutoff.edit())
+        self.setTabOrder(self._cutoff.edit(), self._cutoff.button())
+        self.setTabOrder(self._cutoff.button(), self._output)
         self.setTabOrder(self._output, browse)
         self.setTabOrder(browse, self._redownload)
         self.setTabOrder(self._redownload, self._start)
@@ -170,6 +195,7 @@ class NewRunPage(QWidget):
         checks = (
             ("id", self._project, self._project_err, validation.project_id_error(self._project.text())),
             ("url", self._url, self._url_err, validation.url_error(self._url.text())),
+            ("date", self._cutoff, self._cutoff_err, self._cutoff.error()),
             ("out", self._output, self._output_err, validation.output_dir_error(self._output.text())),
         )
         ok = True
@@ -178,8 +204,11 @@ class NewRunPage(QWidget):
             show = error is not None and key in self._touched
             err_label.setText(error if show else "")
             err_label.setVisible(show)
-            edit.setProperty("invalid", show)
-            repolish(edit)
+            if isinstance(edit, DateInput):
+                edit.set_invalid(show)
+            else:
+                edit.setProperty("invalid", show)
+                repolish(edit)
         self._start.setEnabled(ok and not self._busy)
         self._update_existing_notice()
         return ok
@@ -210,17 +239,17 @@ class NewRunPage(QWidget):
     def _submit(self) -> None:
         if self._busy:                   # Enter in a field must not bypass the disabled button
             return
-        self._touched.update({"id", "url", "out"})
+        self._touched.update({"id", "url", "date", "out"})
         if not self._validate():
             return
-        qd = self._cutoff.date()
-        cutoff = datetime(qd.year(), qd.month(), qd.day())
+        cutoff = self._cutoff.date()          # validated above, so never None here
         req = RunRequest(
             project_id=self._project.text().strip(),
             url=self._url.text().strip(),
             cutoff=cutoff,
             output_root=Path(self._output.text().strip()),
             overwrite_downloads=self._redownload.isChecked(),
+            startpoint=validation.clean_startpoint(self._startpoint.text()),
         )
         self._settings.output_dir = req.output_root
         self._settings.remember_run(req.project_id, req.url, cutoff.strftime("%Y-%m-%d"))
@@ -233,3 +262,7 @@ class NewRunPage(QWidget):
 
     def focus_first(self) -> None:
         self._project.setFocus()
+
+    def _refresh_note_icon(self) -> None:
+        self._note_icon.setPixmap(icons.pixmap("alert", theme.current()["accent_ink"], 20,
+                                               self.devicePixelRatioF(), 1.8))

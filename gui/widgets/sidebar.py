@@ -1,4 +1,4 @@
-"""Left navigation rail: logo, four pages, theme toggle, version."""
+"""Left navigation rail: logo, the pages (New run … Agent), theme toggle, version."""
 from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -14,6 +14,8 @@ NAV = (
     ("results",      "Results",      "chart",    "Alt+2"),
     ("history",      "History",      "history",  "Alt+3"),
     ("date_checker", "Date checker", "calendar", "Alt+4"),
+    ("notes",        "Notes",        "notes",    "Alt+5"),
+    ("agent",        "Agent 🤖",     "bot",      "Alt+6"),
 )
 
 
