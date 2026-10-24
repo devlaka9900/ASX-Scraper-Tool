@@ -16,8 +16,11 @@ from gui.settings import Settings
 from gui.widgets.common import IconButton, card, label
 from gui.widgets.watermark import WatermarkWidget
 
-COLS = ("Run", "DocumentId", "Startpoint", "Cutoff", "Result", "PDFs", "Duration", "Status")
-C_RUN, C_PROJECT, C_START, C_CUTOFF, C_RESULT, C_PDFS, C_DUR, C_STATUS = range(8)
+COLS = ("Run", "DocumentId", "Startpoint", "Cutoff", "Result", "PDFs", "Pages updated", "Total pages",
+        "Duration", "Status")
+(C_RUN, C_PROJECT, C_START, C_CUTOFF, C_RESULT, C_PDFS, C_UPAGES, C_TPAGES, C_DUR,
+ C_STATUS) = range(10)
+_NUMERIC_COLS = (C_PDFS, C_UPAGES, C_TPAGES)
 ITEM_ROLE = Qt.ItemDataRole.UserRole
 _STATUS_LABEL = {"completed": "Completed", "cancelled": "Cancelled", "failed": "Failed"}
 
@@ -108,9 +111,10 @@ class HistoryPage(QWidget):
         header.setHighlightSections(False)
         header.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         header.setSectionResizeMode(C_PROJECT, QHeaderView.ResizeMode.Stretch)
-        # at the 1100px minimum the DocumentId (stretch column) must still get ~150px
-        for col, width in ((C_RUN, 122), (C_START, 128), (C_CUTOFF, 88), (C_RESULT, 100), (C_PDFS, 52),
-                           (C_DUR, 76), (C_STATUS, 94)):
+        # the DocumentId (stretch column) gets whatever is left (~10px at the 1100px minimum, ~190px at
+        # 1280px); its full text is in the tooltip
+        for col, width in ((C_RUN, 122), (C_START, 96), (C_CUTOFF, 90), (C_RESULT, 72), (C_PDFS, 54),
+                           (C_UPAGES, 108), (C_TPAGES, 92), (C_DUR, 76), (C_STATUS, 90)):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
             header.resizeSection(col, width)
         self._table.itemSelectionChanged.connect(self._update_buttons)
@@ -149,7 +153,9 @@ class HistoryPage(QWidget):
             cells = {
                 C_RUN: when, C_PROJECT: m.project_id, C_START: m.startpoint or "—",
                 C_CUTOFF: m.cutoff, C_RESULT: "",
-                C_PDFS: f"{s.get('total', 0):,}",
+                C_PDFS: _num(s.get('total')),
+                C_UPAGES: _num(s.get('updated_pages')),
+                C_TPAGES: _num(s.get('total_pages')),
                 C_DUR: f"{m.duration_s:.0f} s" if m.duration_s else "—",
                 C_STATUS: _STATUS_LABEL.get(m.status, m.status) + ("" if item.base_exists else " (files missing)"),
             }
@@ -158,7 +164,7 @@ class HistoryPage(QWidget):
                 cell.setData(ITEM_ROLE, item)
                 if col in (C_PROJECT, C_START) and text and text != "—":
                     cell.setToolTip(text)             # full text when the column is narrow
-                if col == C_PDFS:
+                if col in _NUMERIC_COLS:
                     cell.setTextAlignment(int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter))
                 if col == C_RESULT:
                     cell.setToolTip(
@@ -219,6 +225,14 @@ class HistoryPage(QWidget):
     def showEvent(self, event) -> None:
         super().showEvent(event)
         self.refresh()
+
+
+def _num(value) -> str:
+    """Thousands-separated count; a missing / null / hand-edited stat shows 0 instead of crashing refresh()."""
+    try:
+        return f"{int(value or 0):,}"
+    except (TypeError, ValueError):
+        return "0"
 
 
 def _fmt(iso: str) -> str:

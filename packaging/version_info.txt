@@ -3,11 +3,11 @@
   kids=[
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', 'CUBE'),
-      StringStruct('FileDescription', 'ASX PDF Checker'),
+      StringStruct('FileDescription', 'ASX Reg Data'),
       StringStruct('FileVersion', '1.2.0.0'),
-      StringStruct('InternalName', 'ASX PDF Checker'),
-      StringStruct('OriginalFilename', 'ASX PDF Checker.exe'),
-      StringStruct('ProductName', 'ASX PDF Checker'),
+      StringStruct('InternalName', 'ASX Reg Data'),
+      StringStruct('OriginalFilename', 'ASX Reg Data.exe'),
+      StringStruct('ProductName', 'ASX Reg Data'),
       StringStruct('ProductVersion', '1.2.0.0')])]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]

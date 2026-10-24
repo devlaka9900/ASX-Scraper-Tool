@@ -12,17 +12,18 @@ from PySide6.QtGui import (
     QAction, QBrush, QColor, QFont, QIcon, QKeySequence, QPainter, QPixmap, QShortcut, QTextCharFormat, QTextCursor,
 )
 from PySide6.QtWidgets import (
-    QAbstractItemView, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox,
+    QAbstractItemView, QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox,
     QPushButton, QStackedWidget, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from core.notes import BODY_MAX, TITLE_MAX, Note, NotesError, NotesStore
 from gui import icons, theme
 from gui.notes_html import PALETTE, document_to_html, load_html, plain_text, sanitize_html
-from gui.widgets.common import IconButton, card, divider, label, primary
+from gui.widgets.common import IconButton, card, divider, label, primary, secondary
 from gui.widgets.watermark import WatermarkWidget
 
 NOTE_ROLE = Qt.ItemDataRole.UserRole
+BODY_CSS = "p { margin-top: 0px; margin-bottom: 0px; }"
 
 
 def _fmt_time(iso: str) -> str:
@@ -97,6 +98,61 @@ def _tool_button(text: str, tip: str, font: QFont | None = None) -> QPushButton:
     return btn
 
 
+class NoteViewDialog(QDialog):
+    """Read-only view of one note. `action` is "edit" or "delete" when the user chose that, else None."""
+
+    def __init__(self, note: Note, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.action: str | None = None
+        self.setWindowTitle("Note")
+        self.setModal(True)
+        self.setMinimumSize(480, 360)
+        self.resize(660, 540)
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(20, 20, 20, 16)
+        root.setSpacing(12)
+        panel = card()
+        pl = QVBoxLayout(panel)
+        pl.setContentsMargins(20, 18, 20, 16)
+        pl.setSpacing(10)
+        self._title = label(note.title, "h2", wrap=True)
+        self._title.setTextFormat(Qt.TextFormat.PlainText)   # a heading like "<b>x</b>" must show literally
+        self._title.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        pl.addWidget(self._title)
+        self._meta = label(f"Created {_fmt_time(note.created_at)}   ·   Updated {_fmt_time(note.updated_at)}", "caption")
+        pl.addWidget(self._meta)
+        pl.addWidget(divider())
+        self._body = QTextEdit()
+        self._body.setReadOnly(True)
+        self._body.setAccessibleName("Note text")
+        self._body.document().setDefaultStyleSheet(BODY_CSS)
+        load_html(self._body.document(), sanitize_html(note.body_html))   # same re-canonicalising as the editor
+        pl.addWidget(self._body, 1)
+        root.addWidget(panel, 1)
+
+        foot = QHBoxLayout()
+        self._delete_btn = IconButton("Delete", "trash", variant="danger", icon_role="text")
+        self._delete_btn.setToolTip("Delete this note")
+        self._delete_btn.clicked.connect(lambda: self._finish("delete"))
+        foot.addWidget(self._delete_btn)
+        foot.addStretch(1)
+        self._edit_btn = secondary("Edit")
+        self._edit_btn.setToolTip("Edit this note")
+        self._edit_btn.clicked.connect(lambda: self._finish("edit"))
+        foot.addWidget(self._edit_btn)
+        self._close_btn = primary("Close")
+        self._close_btn.setDefault(True)
+        self._close_btn.setMinimumWidth(110)
+        self._close_btn.clicked.connect(self.reject)
+        foot.addWidget(self._close_btn)
+        root.addLayout(foot)
+
+    def _finish(self, action: str) -> None:
+        self.action = action
+        self.accept()
+
+
 class NotesPage(QWidget):
     def __init__(self, store: NotesStore | None, error: str | None = None, parent: QWidget | None = None):
         super().__init__(parent)
@@ -105,7 +161,7 @@ class NotesPage(QWidget):
         self._current_id: str | None = None
         self._dirty = False
         self._loading = False
-        self._suppress_select = False
+        self._viewing = False                       # a viewer dialog is open (blocks a double-click opening two)
         self._last_color: str | None = None
 
         root = QVBoxLayout(self)
@@ -123,16 +179,17 @@ class NotesPage(QWidget):
         self._banner.setVisible(False)
         root.addWidget(self._banner)
 
-        body = QHBoxLayout()
-        body.setSpacing(14)
-        root.addLayout(body, 1)
+        # ---- stack [list | editor | unavailable]; the list is the landing view -------- #
+        self._stack = QStackedWidget()
+        root.addWidget(self._stack, 1)
 
-        # ---- left: search + list ---------------------------------------------------- #
-        left = card()
-        left.setFixedWidth(330)
-        ll = QVBoxLayout(left)
+        # ---- list: search + New note + full-width list (a click opens the viewer) ----- #
+        list_page = card()
+        ll = QVBoxLayout(list_page)
         ll.setContentsMargins(14, 14, 14, 12)
         ll.setSpacing(10)
+        top = QHBoxLayout()
+        top.setSpacing(10)
         self._search = QLineEdit()
         self._search.setPlaceholderText("Search notes  (Ctrl+F)")
         self._search.setClearButtonEnabled(True)
@@ -140,13 +197,14 @@ class NotesPage(QWidget):
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
         self._debounce.setInterval(150)
-        self._debounce.timeout.connect(lambda: self._populate(select_id=self._current_id))
+        self._debounce.timeout.connect(self._populate)
         self._search.textChanged.connect(lambda _t: self._debounce.start())
-        ll.addWidget(self._search)
+        top.addWidget(self._search, 1)
         self._new_btn = primary("New note", "plus")
         self._new_btn.setToolTip("Create a note (Ctrl+N)")
         self._new_btn.clicked.connect(self.new_note)
-        ll.addWidget(self._new_btn)
+        top.addWidget(self._new_btn)
+        ll.addLayout(top)
         self._list = QListWidget()
         self._list.setProperty("noteList", True)
         self._list.setItemDelegate(_NoteDelegate(self._list))
@@ -155,27 +213,27 @@ class NotesPage(QWidget):
         self._list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._list.setUniformItemSizes(True)
         self._list.setAccessibleName("Notes list")
-        self._list.currentItemChanged.connect(self._on_current_changed)
-        ll.addWidget(self._list, 1)
+        self._list.itemClicked.connect(self._on_item_open)
+        self._list.itemActivated.connect(self._on_item_open)          # Enter on the keyboard
+        self._list_stack = QStackedWidget()                            # [list | empty watermark]
+        self._list_stack.addWidget(self._list)
+        ll.addWidget(self._list_stack, 1)
         self._count = label("", "caption")
         ll.addWidget(self._count)
-        body.addWidget(left)
-
-        # ---- right: stack [empty | editor | unavailable] ------------------------------- #
-        self._stack = QStackedWidget()
-        body.addWidget(self._stack, 1)
+        self._list_page = list_page
 
         empty = WatermarkWidget()
         el = QVBoxLayout(empty)
         el.addStretch(1)
-        t1 = label("No notes yet", "h2")
-        t1.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        t2 = label("Create your first note to get started.", "muted")
-        t2.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        el.addWidget(t1)
-        el.addWidget(t2)
+        self._empty_title = label("No notes yet", "h2")
+        self._empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._empty_hint = label("Create your first note to get started.", "muted")
+        self._empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        el.addWidget(self._empty_title)
+        el.addWidget(self._empty_hint)
         el.addStretch(1)
         self._empty = empty
+        self._list_stack.addWidget(empty)
 
         editor = card()
         ed = QVBoxLayout(editor)
@@ -223,7 +281,7 @@ class NotesPage(QWidget):
         self._body.setAcceptRichText(False)          # pasted text is plain; formatting only via the toolbar
         self._body.setPlaceholderText("Write your note…")
         self._body.setAccessibleName("Note text")
-        self._body.document().setDefaultStyleSheet("p { margin-top: 0px; margin-bottom: 0px; }")
+        self._body.document().setDefaultStyleSheet(BODY_CSS)
         self._body.document().contentsChanged.connect(self._mark_dirty)
         self._body.currentCharFormatChanged.connect(self._sync_toolbar)
         ed.addWidget(self._body, 1)
@@ -236,10 +294,14 @@ class NotesPage(QWidget):
         foot.addStretch(1)
         self._meta = label("", "caption")
         foot.addWidget(self._meta)
+        self._back_btn = secondary("Back to notes")
+        self._back_btn.setToolTip("Return to the notes list")
+        self._back_btn.clicked.connect(self.back_to_list)
+        foot.addWidget(self._back_btn)
         self._save_btn = primary("Save", "check")
-        self._save_btn.setToolTip("Save (Ctrl+S)")
+        self._save_btn.setToolTip("Save and return to the list (Ctrl+S)")
         self._save_btn.setMinimumWidth(110)
-        self._save_btn.clicked.connect(self.save)
+        self._save_btn.clicked.connect(self._save_and_close)
         foot.addWidget(self._save_btn)
         ed.addLayout(foot)
         self._editor = editor
@@ -254,12 +316,12 @@ class NotesPage(QWidget):
         ul.addStretch(1)
         self._unavailable = unavailable
 
-        for page in (self._empty, self._editor, self._unavailable):
+        for page in (self._list_page, self._editor, self._unavailable):
             self._stack.addWidget(page)
 
-        for seq, slot in (("Ctrl+S", self.save), ("Ctrl+N", self.new_note)):
+        for seq, slot in (("Ctrl+S", self._save_and_close), ("Ctrl+N", self.new_note)):
             QShortcut(QKeySequence(seq), self, activated=slot, context=Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        QShortcut(QKeySequence("Ctrl+F"), self, activated=lambda: (self._search.setFocus(), self._search.selectAll()),
+        QShortcut(QKeySequence("Ctrl+F"), self, activated=self._focus_search,
                   context=Qt.ShortcutContext.WidgetWithChildrenShortcut)
 
         theme.bus.changed.connect(self._on_theme)
@@ -279,8 +341,7 @@ class NotesPage(QWidget):
                 kept = f" The original file was kept as “{store.kept_damaged.name}”." if store.kept_damaged else ""
                 self._show_banner(f"{store.skipped} damaged note(s) in the notes file could not be read and were "
                                   f"skipped.{kept}")
-            self._populate()
-            self._select_first_or_empty()
+            self._populate()                        # the list is the first page of the stack
 
     # ------------------------------------------------------------------ #
     # List
@@ -290,66 +351,63 @@ class NotesPage(QWidget):
         self._banner_text.setText(text)
         self._banner.setVisible(True)
 
-    def _populate(self, select_id: str | None = None) -> None:
+    def _populate(self) -> None:
         if self._store is None:
             return
         notes = self._store.search(self._search.text())
-        self._suppress_select = True
         self._list.clear()
         for n in notes:
             item = QListWidgetItem()
             item.setData(NOTE_ROLE, n)
             item.setToolTip(n.title)
             self._list.addItem(item)
-            if select_id and n.id == select_id:
-                self._list.setCurrentItem(item)
-        self._suppress_select = False
         total = len(self._store)
         query = self._search.text().strip()
         self._count.setText(f"{len(notes)} of {total} notes" if query else f"{total} note{'s' if total != 1 else ''}")
+        if not notes:
+            self._empty_title.setText("No matching notes" if total else "No notes yet")
+            self._empty_hint.setText("Try a different search." if total else "Create your first note to get started.")
+        self._list_stack.setCurrentWidget(self._list if notes else self._empty)
 
-    def _select_first_or_empty(self) -> None:
-        if self._list.count():
-            self._list.setCurrentRow(0)            # triggers _on_current_changed -> loads it
-        else:
-            self._current_id = None
-            self._stack.setCurrentWidget(self._empty)
+    def _show_list(self) -> None:
+        """Leave the editor for the list (callers have already saved / discarded / deleted)."""
+        self._current_id = None
+        self._dirty = False
+        self._stack.setCurrentWidget(self._list_page)
 
-    def _on_current_changed(self, current: QListWidgetItem | None, previous: QListWidgetItem | None) -> None:
-        if self._suppress_select or current is None:
+    def _focus_search(self) -> None:
+        if self._stack.currentWidget() is self._list_page:
+            self._search.setFocus()
+            self._search.selectAll()
+
+    def _on_item_open(self, item: QListWidgetItem) -> None:
+        note: Note = item.data(NOTE_ROLE)
+        self.view_note(note.id)
+
+    def view_note(self, note_id: str) -> None:
+        """Open the read-only viewer; its Edit button hands the note to the editor, Delete removes it."""
+        if self._store is None or self._viewing:
             return
-        note: Note = current.data(NOTE_ROLE)
-        if note.id == self._current_id:
+        note = self._store.get(note_id)
+        if note is None:
             return
-        if not self._confirm_discard():
-            self._suppress_select = True            # put the selection back on the note being edited
-            if previous is not None:
-                self._list.setCurrentItem(previous)
-            else:
-                self._list.setCurrentRow(-1)
-            self._suppress_select = False
-            return
-        self._load(note)
-        # a "Save" answer inside the prompt rebuilt the list around the *old* note; put the
-        # highlight back on the note that is actually shown in the editor
-        self._select_in_list(note.id)
+        self._viewing = True
+        try:
+            dialog = NoteViewDialog(note, self)
+            dialog.exec()
+            action = dialog.action
+        finally:
+            self._viewing = False
+        if action == "edit":
+            self.edit_note(note_id)
+        elif action == "delete":
+            self._delete_stored(note_id)
 
     def _reset_typing_format(self) -> None:
         """A cleared / reloaded editor starts with plain typing (otherwise bold, italic, underline
         or a colour switched on in the previous note would carry over into the next one)."""
         self._body.setCurrentCharFormat(QTextCharFormat())
         self._sync_toolbar(QTextCharFormat())
-
-    def _select_in_list(self, note_id: str) -> None:
-        self._suppress_select = True
-        try:
-            for row in range(self._list.count()):
-                item = self._list.item(row)
-                if item.data(NOTE_ROLE).id == note_id:
-                    self._list.setCurrentItem(item)
-                    break
-        finally:
-            self._suppress_select = False
 
     # ------------------------------------------------------------------ #
     # CRUD
@@ -358,10 +416,6 @@ class NotesPage(QWidget):
     def new_note(self) -> None:
         if self._store is None or not self._confirm_discard():
             return
-        self._suppress_select = True
-        self._list.clearSelection()
-        self._list.setCurrentRow(-1)
-        self._suppress_select = False
         self._loading = True
         self._current_id = None
         self._title.clear()
@@ -373,6 +427,14 @@ class NotesPage(QWidget):
         self._refresh_state("New note — not saved yet")
         self._stack.setCurrentWidget(self._editor)
         self._title.setFocus()
+
+    def edit_note(self, note_id: str) -> None:
+        """Open a stored note in the editor (the only place notes are edited)."""
+        note = self._store.get(note_id) if self._store is not None else None
+        if note is None or not self._confirm_discard():
+            return
+        self._load(note)
+        self._body.setFocus()
 
     def _load(self, note: Note) -> None:
         self._loading = True
@@ -413,12 +475,26 @@ class NotesPage(QWidget):
         self._loading = True
         self._title.setText(note.title)               # reflects the collapsed / default heading
         self._loading = False
-        self._populate(select_id=note.id)
+        self._populate()
         self._refresh_state(f"Saved {_fmt_time(note.updated_at)}")
         self._meta.setText(f"Created {_fmt_time(note.created_at)}")
         return True
 
+    def _save_and_close(self) -> None:
+        """Save button / Ctrl+S: save, then return to the list (stays in the editor if saving fails)."""
+        if self._stack.currentWidget() is not self._editor or not self._save_btn.isEnabled():
+            return
+        if self.save():
+            self._show_list()
+
+    def back_to_list(self) -> None:
+        """Back button: return to the list, asking first when the editor holds unsaved changes."""
+        if self._store is None or not self._confirm_discard():
+            return
+        self._show_list()
+
     def delete_note(self) -> None:
+        """Delete button in the editor: removes the open note (or discards an unsaved draft)."""
         if self._store is None:
             return
         if self._current_id is None:                    # an unsaved draft: just discard it
@@ -428,26 +504,28 @@ class NotesPage(QWidget):
                                               QMessageBox.StandardButton.No)
                 if answer != QMessageBox.StandardButton.Yes:
                     return
-            self._dirty = False
             self._populate()
-            self._select_first_or_empty()
+            self._show_list()
             return
-        note = self._store.get(self._current_id)
+        if self._delete_stored(self._current_id):
+            self._show_list()
+
+    def _delete_stored(self, note_id: str) -> bool:
+        """Confirm, then delete a stored note and refresh the list. True when it was deleted."""
+        note = self._store.get(note_id)
         name = note.title if note else "this note"
         answer = QMessageBox.question(self, "Delete note", f"Delete “{name}”?\n\nThis cannot be undone.",
                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                       QMessageBox.StandardButton.No)
         if answer != QMessageBox.StandardButton.Yes:
-            return
+            return False
         try:
-            self._store.delete(self._current_id)
+            self._store.delete(note_id)
         except OSError as exc:
             QMessageBox.warning(self, "Notes", f"The note could not be deleted:\n\n{exc}")
-            return
-        self._current_id = None
-        self._dirty = False
+            return False
         self._populate()
-        self._select_first_or_empty()
+        return True
 
     # ------------------------------------------------------------------ #
     # Unsaved-changes guard
@@ -494,13 +572,12 @@ class NotesPage(QWidget):
         self._refresh_state("")
 
     def can_leave(self) -> bool:
-        """Called before navigating away / closing. A discarded blank draft must not linger in
-        the editor, so show the first note (or the empty state) afterwards."""
-        had_draft = self._dirty and self._current_id is None
+        """Called before navigating away / closing. Once the edits are saved or discarded the page
+        goes back to the list, so nothing stale (a discarded draft) lingers in the editor."""
         if not self._confirm_discard():
             return False
-        if had_draft and self._store is not None:
-            self._select_first_or_empty()
+        if self._store is not None and self._stack.currentWidget() is self._editor:
+            self._show_list()
         return True
 
     def _mark_dirty(self) -> None:

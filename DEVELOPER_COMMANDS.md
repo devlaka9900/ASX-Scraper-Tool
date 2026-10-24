@@ -1,4 +1,4 @@
-# Developer commands — ASX PDF Checker
+# Developer commands — ASX Reg Data
 
 Run everything from the project root in **PowerShell**. Paths use `.venv-build\Scripts\python.exe`
 (the pinned build/test virtual environment); `python` alone means your global Python.
@@ -30,7 +30,7 @@ If pip stalls on a flaky network, retry with longer timeouts:
 | Desktop GUI from source | `.venv-build\Scripts\python.exe gui_main.py` |
 | Command-line tool (scrape → download → report) | `python main.py` |
 | Re-check dates of already-downloaded PDFs (CLI) | `python check_pdf_dates.py` |
-| Packaged exe | `dist\ASX PDF Checker\ASX PDF Checker.exe` |
+| Packaged exe | `dist\ASX Reg Data\ASX Reg Data.exe` |
 
 Set `PYTHONUTF8=1` if the CLI prints encoding errors on a legacy console:
 
@@ -83,7 +83,7 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 
 What it does: reads the version from `core\version.py` → installs pinned deps in `.venv-build` →
 docs check → PyInstaller into `build\stage` → **self-test gate** → **launch/clean-exit gate** →
-zip to `dist\ASX_PDF_Checker_v<version>.zip` → refresh `dist\ASX PDF Checker` (only if the exe is not running;
+zip to `dist\ASX_Reg_Data_v<version>.zip` → refresh `dist\ASX Reg Data` (only if the exe is not running;
 a user's `output\` folder there is preserved).
 
 | Variant | Command |
@@ -97,14 +97,14 @@ Plain PyInstaller (no gates, no zip, no docs — not for releases):
 .venv-build\Scripts\python.exe -m PyInstaller packaging\asx_pdf_checker.spec --noconfirm --clean
 ```
 
-Outputs: `dist\ASX_PDF_Checker_v<version>.zip` (hand this to other devs), `dist\ASX PDF Checker\` (runnable folder),
+Outputs: `dist\ASX_Reg_Data_v<version>.zip` (hand this to other devs), `dist\ASX Reg Data\` (runnable folder),
 `build\stage\` (the verified build).
 
 Check a built exe by hand:
 
 ```powershell
-& "dist\ASX PDF Checker\ASX PDF Checker.exe" --selftest      # exit code 0 = healthy
-(Get-Item "dist\ASX PDF Checker\ASX PDF Checker.exe").VersionInfo.FileVersion
+& "dist\ASX Reg Data\ASX Reg Data.exe" --selftest      # exit code 0 = healthy
+(Get-Item "dist\ASX Reg Data\ASX Reg Data.exe").VersionInfo.FileVersion
 ```
 
 Regenerate the app icon (only if you change the logo): `.venv-build\Scripts\python.exe tools\make_icon.py`
@@ -138,7 +138,7 @@ or has no Changelog entry.
 | `tools\` | dev-only test and utility scripts |
 | `docs\index.html` | offline documentation (SRS, tech stack, architecture, guides) |
 
-Runtime data (per Windows user): `%LOCALAPPDATA%\ASX PDF Checker\` → `logs\asx_checker.log`, `logs\crash.log`, `notes.json`.
+Runtime data (per Windows user): `%LOCALAPPDATA%\ASX Reg Data\` → `logs\asx_checker.log`, `logs\crash.log`, `notes.json`.
 Run output: `output\<DocumentId>\` next to the exe (or the folder chosen on the New run page).
 
 Open the docs: `start docs\index.html`
@@ -160,9 +160,9 @@ git tag v1.2.0
 
 ## 8. Handing the exe to other devs (no repo needed)
 
-1. Send `dist\ASX_PDF_Checker_v<version>.zip` (optional checksum: `Get-FileHash dist\ASX_PDF_Checker_v1.2.0.zip`).
-2. They unzip to a **short, writable** path (e.g. `C:\Tools\ASX PDF Checker\`), not `Program Files`.
-3. Run `ASX PDF Checker.exe`. The exe is unsigned: on the SmartScreen prompt choose *More info → Run anyway*.
+1. Send `dist\ASX_Reg_Data_v<version>.zip` (optional checksum: `Get-FileHash dist\ASX_Reg_Data_v1.2.0.zip`).
+2. They unzip to a **short, writable** path (e.g. `C:\Tools\ASX Reg Data\`), not `Program Files`.
+3. Run `ASX Reg Data.exe`. The exe is unsigned: on the SmartScreen prompt choose *More info → Run anyway*.
 4. Needs Windows 10 1809+/11 (64-bit) and internet access to `www.asx.com.au`. No Python required.
 5. Keep the whole unzipped folder together (the exe needs `_internal\`).
 
@@ -178,6 +178,6 @@ git tag v1.2.0
 | Many "No such file or directory" download errors | Windows 260-character path limit: use a shorter output folder or DocumentId. |
 | pip downloads time out / hang | Retry with `--default-timeout 90 --retries 10` (section 1). |
 | CLI prints `UnicodeEncodeError` | `$env:PYTHONUTF8 = "1"` before running. |
-| GUI crashed with no window | Read `%LOCALAPPDATA%\ASX PDF Checker\logs\crash.log`. |
-| Notes file unreadable | Look for `notes.corrupt-*.json` / `notes.json.bak` in `%LOCALAPPDATA%\ASX PDF Checker\`. |
+| GUI crashed with no window | Read `%LOCALAPPDATA%\ASX Reg Data\logs\crash.log`. |
+| Notes file unreadable | Look for `notes.corrupt-*.json` / `notes.json.bak` in `%LOCALAPPDATA%\ASX Reg Data\`. |
 | Tests touch my real notes? | They don't: tests and the self-test use temp note files. |
