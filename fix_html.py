@@ -7,7 +7,7 @@ Semantic ID format: {DivSlug}-{H2Short}-{footnoteNumber}
   e.g.  Rules-section1-35   Rules-guidance1-2   Rules-schedule1-*
 
 Dependencies: pip install beautifulsoup4
-See process.md for full usage guide and adaptation instructions.
+See Dear-Dev/process.md for full usage guide and adaptation instructions.
 """
 
 import re
